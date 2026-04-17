@@ -32,9 +32,11 @@
 
   /* Floating animated blobs */
 .blob {
-  position: absolute;
+  position: fixed;
   border-radius: 50%;
   animation: float 6s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .blob-1 {
