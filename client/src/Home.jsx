@@ -52,7 +52,8 @@ function Home() {
         <div className="blob blob-2" />
         <div className="blob blob-3" />
 
-       <div className="rounded-3xl p-3 bg-[#EFDBFF] gap-2 flex flex-col welcome-banner"><p className="text-center text-[#6A1CF6] text-sm font-bold">WELCOME TO GAMEROOM</p></div>
+       <div className="rounded-3xl p-3 bg-[#EFDBFF] gap-2 flex flex-col welcome-banner">
+        <p className="text-center text-[#6A1CF6] text-sm font-bold">WELCOME TO GAMEROOM</p></div>
       <h1 className="text-6xl font-bold text-center mb-2 italic title-animation">
         <span className="text-gray-700">Ready to </span>
         <span className="text-[#6A1CF6]">Play?</span>
