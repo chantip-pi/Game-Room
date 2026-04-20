@@ -2,13 +2,13 @@ const roomRepository = require('../repositories/RoomRepository');
 const { generateRoomCode } = require('../utils/generateRoomCode');
 
 class RoomService {
-  createRoom(username) {
+  createRoom(username, gameSettings = {}) {
     let roomCode;
     do {
       roomCode = generateRoomCode();
     } while (roomRepository.roomExists(roomCode));
 
-    roomRepository.createRoom(roomCode, { createdBy: username });
+    roomRepository.createRoom(roomCode, { createdBy: username, ...gameSettings });
     roomRepository.addUser(roomCode, username);
 
     return roomCode;

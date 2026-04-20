@@ -1,9 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { FiCopy, FiCheck } from "react-icons/fi";
-import io from "socket.io-client";
-
-const socket = io.connect("http://localhost:3001");
+import socketManager from "./utils/socketManager";
 
 function GameRoom() {
   const [searchParams] = useSearchParams();
@@ -34,23 +32,23 @@ function GameRoom() {
     }
 
     // Join the room
-    socket.emit("join_room", { username, room });
+    socketManager.emit("join_room", { username, room });
 
     // Listen for socket events
-    socket.on("room_joined", (data) => {
+    socketManager.on("room_joined", (data) => {
       setIsJoined(true);
       setError("");
     });
 
-    socket.on("chat_history", (data) => {
+    socketManager.on("chat_history", (data) => {
       setMessages(data.messages || []);
     });
 
-    socket.on("receive_message", (data) => {
+    socketManager.on("receive_message", (data) => {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on("user_joined", (data) => {
+    socketManager.on("user_joined", (data) => {
       setMessages((prev) => [...prev, {
         message: `${data.username} joined the room`,
         type: "system",
@@ -58,7 +56,7 @@ function GameRoom() {
       }]);
     });
 
-    socket.on("user_left", (data) => {
+    socketManager.on("user_left", (data) => {
       setMessages((prev) => [...prev, {
         message: `${data.username} left the room`,
         type: "system",
@@ -66,11 +64,11 @@ function GameRoom() {
       }]);
     });
 
-    socket.on("update_users", (users) => {
+    socketManager.on("update_users", (users) => {
       setOnlineUsers(users);
     });
 
-    socket.on("error", (data) => {
+    socketManager.on("error", (data) => {
       setError(data.message);
       if (data.message.includes("does not exist")) {
         setTimeout(() => navigate("/"), 2000);
@@ -78,18 +76,18 @@ function GameRoom() {
     });
 
     return () => {
-      socket.off("room_joined");
-      socket.off("chat_history");
-      socket.off("receive_message");
-      socket.off("user_joined");
-      socket.off("user_left");
-      socket.off("update_users");
-      socket.off("error");
+      socketManager.off("room_joined");
+      socketManager.off("chat_history");
+      socketManager.off("receive_message");
+      socketManager.off("user_joined");
+      socketManager.off("user_left");
+      socketManager.off("update_users");
+      socketManager.off("error");
     };
   }, [room, username, navigate]);
 
   const handleLeaveRoom = () => {
-    socket.emit("leave_room", { room, username });
+    socketManager.emit("leave_room", { room, username });
     navigate("/");
   };
 
@@ -101,7 +99,7 @@ function GameRoom() {
         username,
         timestamp: new Date().toISOString()
       };
-      socket.emit("send_message", messageData);
+      socketManager.emit("send_message", messageData);
       setMessage("");
     }
   };

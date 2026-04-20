@@ -1,8 +1,6 @@
 import "./App.css";
-import io from "socket.io-client";
 import { useEffect, useState, useRef } from "react";
-
-const socket = io.connect("http://localhost:3001");
+import socketManager from "./utils/socketManager";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -23,11 +21,13 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    socket.on("receive_message", (data) => {
+    const socket = socketManager.connect();
+
+    socketManager.on("receive_message", (data) => {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on("user_joined", (data) => {
+    socketManager.on("user_joined", (data) => {
       setMessages((prev) => [...prev, {
         message: `${data.username} joined the room`,
         type: "system",
@@ -35,7 +35,7 @@ function App() {
       }]);
     });
 
-    socket.on("user_left", (data) => {
+    socketManager.on("user_left", (data) => {
       setMessages((prev) => [...prev, {
         message: `${data.username} left the room`,
         type: "system",
@@ -43,50 +43,50 @@ function App() {
       }]);
     });
 
-    socket.on("update_users", (users) => {
+    socketManager.on("update_users", (users) => {
       setOnlineUsers(users);
     });
 
-    socket.on("room_joined", (data) => {
+    socketManager.on("room_joined", (data) => {
       setIsJoined(true);
       setError("");
     });
 
-    socket.on("room_created", (data) => {
+    socketManager.on("room_created", (data) => {
       setRoom(data.roomCode);
       setIsJoined(true);
       setError("");
     });
 
-    socket.on("chat_history", (data) => {
+    socketManager.on("chat_history", (data) => {
       setMessages(data.messages || []);
     });
 
-    socket.on("error", (data) => {
+    socketManager.on("error", (data) => {
       setError(data.message);
     });
 
     return () => {
-      socket.off("receive_message");
-      socket.off("user_joined");
-      socket.off("user_left");
-      socket.off("update_users");
-      socket.off("room_joined");
-      socket.off("room_created");
-      socket.off("chat_history");
-      socket.off("error");
+      socketManager.off("receive_message");
+      socketManager.off("user_joined");
+      socketManager.off("user_left");
+      socketManager.off("update_users");
+      socketManager.off("room_joined");
+      socketManager.off("room_created");
+      socketManager.off("chat_history");
+      socketManager.off("error");
     };
   }, []);
 
   const joinRoom = () => {
     if (username !== "" && room !== "") {
-      socket.emit("join_room", { username, room });
+      socketManager.emit("join_room", { username, room });
     }
   };
 
   const createRoom = () => {
     if (username !== "") {
-      socket.emit("create_room", { username });
+      socketManager.emit("create_room", { username });
     }
   };
 
@@ -98,7 +98,7 @@ function App() {
         username,
         timestamp: new Date().toISOString()
       };
-      socket.emit("send_message", messageData);
+      socketManager.emit("send_message", messageData);
       setMessage("");
     }
   };

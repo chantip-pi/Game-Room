@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LuCirclePlus, LuMessageCircleWarning } from "react-icons/lu";
-import io from "socket.io-client";
 import { FaDiceD20, FaDiceD6 } from "react-icons/fa";
 import { GiD12 } from "react-icons/gi";
 import { useRef } from "react";
 import { FiUploadCloud } from "react-icons/fi";
-
-
-const socket = io.connect("http://localhost:3001");
+import socketManager from "./utils/socketManager";
 
 function CreateRoom() {
 
@@ -30,19 +27,21 @@ function CreateRoom() {
   const players = [4, 5, 6, 7, 8];
 
   useEffect(() => {
-    socket.on("room_created", (data) => {
+    socketManager.connect();
+
+    socketManager.on("room_created", (data) => {
       setIsCreating(false);
       navigate(`/gameroom?room=${data.roomCode}&username=${username}`);
     });
 
-    socket.on("error", (data) => {
+    socketManager.on("error", (data) => {
       setIsCreating(false);
       setError(data.message);
     });
 
     return () => {
-      socket.off("room_created");
-      socket.off("error");
+      socketManager.off("room_created");
+      socketManager.off("error");
     };
   }, [username, navigate]);
 
@@ -53,7 +52,7 @@ function CreateRoom() {
     }
     setIsCreating(true);
     setError("");
-    socket.emit("create_room", { username, dice, playerCount, turnLimit });
+    socketManager.emit("create_room", { username, dice, playerCount, turnLimit });
   };
 
   
