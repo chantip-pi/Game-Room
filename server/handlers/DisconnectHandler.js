@@ -5,10 +5,17 @@ function disconnectHandler(io, socket) {
     console.log(`User disconnected: ${socket.id}`);
 
     if (socket.room && socket.username) {
+      // Clean up pawn position before leaving
+      roomService.removePawnPosition(socket.room, socket.username);
+      
       const result = roomService.leaveRoom(socket.room, socket.username);
       
       socket.leave(socket.room);
       socket.to(socket.room).emit('user_left', { username: socket.username });
+      
+      // Clean up user profile when leaving
+      roomService.removeUserProfile(socket.room, socket.username);
+      io.to(socket.room).emit('user_profile_remove', { username: socket.username });
       
       // Notify about pawn removal
       socket.to(socket.room).emit('user_left_pawn', { username: socket.username });

@@ -83,6 +83,9 @@ function registerRoomHandlers(io, socket) {
       return socket.emit('error', { message: 'Room and username are required.' });
     }
 
+    // Clean up pawn position before leaving
+    roomService.removePawnPosition(room, username);
+    
     const result = roomService.leaveRoom(room, username);
     
     socket.leave(room);
@@ -91,6 +94,9 @@ function registerRoomHandlers(io, socket) {
     // Clean up user profile when leaving
     roomService.removeUserProfile(room, username);
     io.to(room).emit('user_profile_remove', { username });
+    
+    // Broadcast pawn removal to all users in room
+    io.to(room).emit('user_left_pawn', { username });
     
     if (!result.roomDeleted) {
       io.to(room).emit('update_users', result.users);
