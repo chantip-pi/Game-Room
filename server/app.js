@@ -6,6 +6,7 @@ const cors = require('cors');
 const registerRoomHandlers = require('./handlers/RoomHandler');
 const registerMessageHandlers = require('./handlers/MessageHandler');
 const registerDisconnectHandler = require('./handlers/DisconnectHandler');
+const pawnHandler = require('./handlers/PawnHandler');
  
 function createApp({ clientOrigin = 'http://localhost:5173' } = {}) {
   const app = express();
@@ -22,10 +23,11 @@ function createApp({ clientOrigin = 'http://localhost:5173' } = {}) {
  
     registerRoomHandlers(io, socket);
     registerMessageHandlers(io, socket);
+    pawnHandler(io, socket);
     registerDisconnectHandler(io, socket);
   });
  
   return server;
 }
- 
+
 module.exports = { createApp };

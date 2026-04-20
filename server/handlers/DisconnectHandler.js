@@ -1,24 +1,25 @@
 const roomService = require('../services/RoomService');
 
-function registerDisconnectHandler(io, socket) {
+function disconnectHandler(io, socket) {
   socket.on('disconnect', () => {
-    const { username, room } = socket;
+    console.log(`User disconnected: ${socket.id}`);
 
-    if (username && room) {
-      const result = roomService.leaveRoom(room, username);
-
-      if (result.roomDeleted) {
-        console.log(`Room ${room} deleted (empty).`);
-      } else {
-        socket.to(room).emit('user_left', { username });
-        io.to(room).emit('update_users', result.users);
+    if (socket.room && socket.username) {
+      const result = roomService.leaveRoom(socket.room, socket.username);
+      
+      socket.leave(socket.room);
+      socket.to(socket.room).emit('user_left', { username: socket.username });
+      
+      // Notify about pawn removal
+      socket.to(socket.room).emit('user_left_pawn', { username: socket.username });
+      
+      if (!result.roomDeleted) {
+        io.to(socket.room).emit('update_users', result.users);
       }
 
-      console.log(`${username} left room ${room}`);
+      console.log(`${socket.username} left room ${socket.room} due to disconnection`);
     }
-
-    console.log(`User disconnected: ${socket.id}`);
   });
 }
 
-module.exports = registerDisconnectHandler;
+module.exports = disconnectHandler;

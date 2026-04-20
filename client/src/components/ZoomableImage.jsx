@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
+import UserPawn from './UserPawn';
 
-const ZoomableImage = ({ imageUrl, containerWidth, containerHeight }) => {
+const ZoomableImage = ({ imageUrl, containerWidth, containerHeight, userPawns, currentUsername, onPawnMove }) => {
   const [image, setImage] = useState(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -133,6 +134,37 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight }) => {
             width={image.width}
             height={image.height}
           />
+        </Layer>
+        
+        {/* Pawn Layer */}
+        <Layer>
+          {Object.entries(userPawns || {}).map(([username, position]) => (
+            <UserPawn
+              key={username}
+              user={username}
+              position={position}
+              isCurrentUser={username === currentUsername}
+              onDragStart={() => {}}
+              onDragMove={(e) => {
+                if (username === currentUsername && onPawnMove) {
+                  const newPos = {
+                    x: e.target.x(),
+                    y: e.target.y()
+                  };
+                  onPawnMove(newPos);
+                }
+              }}
+              onDragEnd={(e) => {
+                if (username === currentUsername && onPawnMove) {
+                  const newPos = {
+                    x: e.target.x(),
+                    y: e.target.y()
+                  };
+                  onPawnMove(newPos);
+                }
+              }}
+            />
+          ))}
         </Layer>
       </Stage>
       

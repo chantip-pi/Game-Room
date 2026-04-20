@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { FiCopy, FiCheck } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
 import ZoomableImage from './components/ZoomableImage';
+import UserPawn from './components/UserPawn';
 import { Stage, Layer, Rect, Text } from 'react-konva';
 
 function GameRoom() {
@@ -20,6 +21,7 @@ function GameRoom() {
   const [copied, setCopied] = useState(false);
   const [mapUrl, setMapUrl] = useState(null);
   const [gameAreaSize, setGameAreaSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [userPawns, setUserPawns] = useState({});
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
 
@@ -158,6 +160,72 @@ function GameRoom() {
     }
   };
 
+  // Initialize pawn position when user joins
+  useEffect(() => {
+    if (isJoined && username) {
+      // Set initial position for current user if not already set
+      if (!userPawns[username]) {
+        const initialPosition = {
+          x: Math.random() * (gameAreaSize.width - 100) + 50,
+          y: Math.random() * (gameAreaSize.height - 200) + 100
+        };
+        
+        setUserPawns(prev => ({
+          ...prev,
+          [username]: initialPosition
+        }));
+        
+        // Notify other users about initial position
+        socketManager.emit("pawn_position", {
+          room,
+          username,
+          position: initialPosition
+        });
+      }
+    }
+  }, [isJoined, username, gameAreaSize]);
+
+  // Handle pawn movement
+  const handlePawnMove = (newPosition) => {
+    setUserPawns(prev => ({
+      ...prev,
+      [username]: newPosition
+    }));
+    
+    // Broadcast position to other users
+    socketManager.emit("pawn_position", {
+      room,
+      username,
+      position: newPosition
+    });
+  };
+
+  // Listen for pawn position updates from other users
+  useEffect(() => {
+    socketManager.on("pawn_position_update", (data) => {
+      if (data.username !== username) {
+        setUserPawns(prev => ({
+          ...prev,
+          [data.username]: data.position
+        }));
+      }
+    });
+
+    // Clean up pawns when users leave
+    socketManager.on("user_left_pawn", (data) => {
+      setUserPawns(prev => {
+        const newPawns = { ...prev };
+        delete newPawns[data.username];
+        return newPawns;
+      });
+    });
+
+    return () => {
+      socketManager.off("pawn_position_update");
+      socketManager.off("user_left_pawn");
+    };
+  }, [username]);
+
   if (!isJoined && !error) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#FDF3FF' }}>
@@ -217,6 +285,9 @@ function GameRoom() {
                 imageUrl={mapUrl} 
                 containerWidth={gameAreaSize.width - 48} // Account for padding
                 containerHeight={gameAreaSize.height - 128} // Account for padding and header
+                userPawns={userPawns}
+                currentUsername={username}
+                onPawnMove={handlePawnMove}
               />
             ) : (
               <div className="flex items-center justify-center h-full bg-gray-50">

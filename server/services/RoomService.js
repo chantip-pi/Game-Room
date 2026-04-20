@@ -1,8 +1,12 @@
 const roomRepository = require('../repositories/RoomRepository');
 const { generateRoomCode } = require('../utils/generateRoomCode');
-const cloudinary = require('cloudinary').v2;
 
 class RoomService {
+  constructor() {
+    this.roomRepository = roomRepository;
+    this.pawnPositions = new Map(); // Store pawn positions by room
+  }
+
   createRoom(username, gameSettings = {}) {
     let roomCode;
     do {
@@ -23,56 +27,26 @@ class RoomService {
   }
 
   leaveRoom(roomCode, username) {
+    // Clean up pawn position
+    this.removePawnPosition(roomCode, username);
+    
     roomRepository.removeUser(roomCode, username);
 
     const isEmpty = roomRepository.getRoomUserCount(roomCode) === 0;
     if (isEmpty) {
-      // Get room info before deletion for cleanup
-      const roomInfo = roomRepository.getRoomInfo(roomCode);
-      const mapPublicId = roomInfo?.gameSettings?.mapPublicId;
-      
       // Delete the room
       roomRepository.deleteRoom(roomCode);
       
-      // Clean up image from Cloudinary if it exists
-      if (mapPublicId) {
-        this.cleanupMapImage(mapPublicId);
-      }
+      // Clean up pawn positions for this room
+      this.pawnPositions.delete(roomCode);
       
-      return { roomDeleted: true, imageCleanedUp: !!mapPublicId };
+      return { roomDeleted: true };
     }
 
     return {
       roomDeleted: false,
       users: roomRepository.getUsersInRoom(roomCode),
     };
-  }
-
-  async cleanupMapImage(publicId) {
-    try {
-      console.log(`Cleaning up map image: ${publicId}`);
-      
-      // Configure Cloudinary (in production, use environment variables)
-      cloudinary.config({
-        cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'game_room',
-        api_key: process.env.CLOUDINARY_API_KEY || '337285976619952',
-        api_secret: process.env.CLOUDINARY_API_SECRET || 'W0yNI4cPRr3uJQOPqyuoOBHfvbs'
-      });
-      
-      // Delete the image from Cloudinary
-      const result = await cloudinary.uploader.destroy(publicId);
-      
-      if (result.result === 'ok') {
-        console.log(`Successfully deleted image: ${publicId}`);
-        return { success: true, publicId, result };
-      } else {
-        console.warn(`Image deletion returned: ${result.result}`, publicId);
-        return { success: false, publicId, result: result.result };
-      }
-    } catch (error) {
-      console.error('Failed to cleanup map image:', error);
-      return { success: false, error: error.message, publicId };
-    }
   }
 
   getUsersInRoom(roomCode) {
@@ -89,6 +63,30 @@ class RoomService {
 
   getRoomInfo(roomCode) {
     return roomRepository.getRoomInfo(roomCode);
+  }
+
+  // Pawn position management
+  updatePawnPosition(roomCode, username, position) {
+    if (!this.pawnPositions.has(roomCode)) {
+      this.pawnPositions.set(roomCode, new Map());
+    }
+    this.pawnPositions.get(roomCode).set(username, position);
+  }
+
+  getPawnPositions(roomCode) {
+    const roomPawns = this.pawnPositions.get(roomCode);
+    return roomPawns ? Object.fromEntries(roomPawns) : {};
+  }
+
+  removePawnPosition(roomCode, username) {
+    const roomPawns = this.pawnPositions.get(roomCode);
+    if (roomPawns) {
+      roomPawns.delete(username);
+      // Clean up empty room entries
+      if (roomPawns.size === 0) {
+        this.pawnPositions.delete(roomCode);
+      }
+    }
   }
 }
 
