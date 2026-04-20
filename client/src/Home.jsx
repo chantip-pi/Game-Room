@@ -3,9 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaArrowRight } from "react-icons/fa";
 import { LuCirclePlus } from "react-icons/lu";
 import { LuMessageCircleWarning } from "react-icons/lu";
-import io from "socket.io-client";
-
-const socket = io.connect("http://localhost:3001");
+import socketManager from "./utils/socketManager";
 
 function Home() {
   const [room, setRoom] = useState("");
@@ -15,19 +13,21 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    socket.on("room_joined", (data) => {
+    socketManager.connect();
+
+    socketManager.on("room_joined", (data) => {
       setIsJoining(false);
       navigate(`/gameroom?room=${room}&username=${username}`);
     });
 
-    socket.on("error", (data) => {
+    socketManager.on("error", (data) => {
       setIsJoining(false);
       setError(data.message);
     });
 
     return () => {
-      socket.off("room_joined");
-      socket.off("error");
+      socketManager.off("room_joined");
+      socketManager.off("error");
     };
   }, [room, username, navigate]);
 
@@ -43,7 +43,7 @@ function Home() {
 
     setIsJoining(true);
     setError("");
-    socket.emit("join_room", { username, room });
+    socketManager.emit("join_room", { username, room });
   };
 
   return (

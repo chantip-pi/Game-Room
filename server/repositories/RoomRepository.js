@@ -7,8 +7,11 @@ class RoomRepository {
 
   // --- Room ---
 
-  createRoom(roomCode, { createdBy }) {
-    this._rooms.set(roomCode, { createdAt: new Date(), createdBy });
+  createRoom(roomCode, roomData) {
+    this._rooms.set(roomCode, { 
+      createdAt: new Date(), 
+      ...roomData 
+    });
     this._roomUsers.set(roomCode, new Set());
     this._roomMessages.set(roomCode, []);
   }

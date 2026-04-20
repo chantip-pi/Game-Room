@@ -1,12 +1,16 @@
 const roomService = require('../services/RoomService');
 
 function registerRoomHandlers(io, socket) {
-  socket.on('create_room', ({ username, dice, playerCount, turnLimit } = {}) => {
+  socket.on('create_room', ({ username, dice, playerCount, turnLimit, mapDataUrl, mapPublicId } = {}) => {
     if (!username) {
       return socket.emit('error', { message: 'Username is required.' });
     }
+    
+    if (!mapDataUrl) {
+      return socket.emit('error', { message: 'Map image is required to create a room.' });
+    }
 
-    const roomCode = roomService.createRoom(username, { dice, playerCount, turnLimit });
+    const roomCode = roomService.createRoom(username, { dice, playerCount, turnLimit, mapDataUrl, mapPublicId });
 
     socket.join(roomCode);
     socket.username = username;
@@ -17,6 +21,10 @@ function registerRoomHandlers(io, socket) {
     socket.emit('room_created', { roomCode });
     socket.emit('update_users', users);
     socket.emit('room_joined', { roomCode });
+    
+    // Send room info including map data to creator
+    const roomInfo = roomService.getRoomInfo(roomCode);
+    socket.emit('room_info', roomInfo);
 
     console.log(`Room ${roomCode} created by ${username}`);
   });
@@ -45,6 +53,10 @@ function registerRoomHandlers(io, socket) {
     // Send chat history to newly joined user
     socket.emit('chat_history', { messages: messageHistory });
     socket.emit('room_joined', { room });
+    
+    // Send room info including map data
+    const roomInfo = roomService.getRoomInfo(room);
+    socket.emit('room_info', roomInfo);
 
     console.log(`${username} joined room ${room}`);
   });

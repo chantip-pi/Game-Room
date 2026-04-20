@@ -6,6 +6,7 @@ import { GiD12 } from "react-icons/gi";
 import { useRef } from "react";
 import { FiUploadCloud } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
+// import { uploadImageUnsigned } from "./utils/cloudinaryUpload";
 
 function CreateRoom() {
 
@@ -31,6 +32,7 @@ function CreateRoom() {
 
     socketManager.on("room_created", (data) => {
       setIsCreating(false);
+      // Navigate to game room - map will be loaded via room_info event
       navigate(`/gameroom?room=${data.roomCode}&username=${username}`);
     });
 
@@ -50,9 +52,22 @@ function CreateRoom() {
       setError("Please enter your name");
       return;
     }
+    
+    if (!map) {
+      setError("Please upload a map image to create a room");
+      return;
+    }
+    
     setIsCreating(true);
     setError("");
-    socketManager.emit("create_room", { username, dice, playerCount, turnLimit });
+    
+    // Convert map to base64 data URL (temporary fallback)
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const mapDataUrl = e.target.result;
+      socketManager.emit("create_room", { username, dice, playerCount, turnLimit, mapDataUrl });
+    };
+    reader.readAsDataURL(map);
   };
 
   
@@ -92,25 +107,26 @@ function CreateRoom() {
       {/* File type banner */}
       <div className="self-start rounded-full px-4 py-1 bg-[#EFDBFF]">
         <p className="text-[#6A1CF6] text-sm font-bold">
-          JPG, PNG up to 20MB
+          REQUIRED: JPG, PNG up to 10MB
         </p>
       </div>
 
       {/* Upload area */}
       <label
-        className="
+        className={`
           flex flex-col items-center justify-center
           h-80
           w-full
           rounded-2xl
           border-2
           border-dashed
-          border-purple-300
-          bg-purple-50
           cursor-pointer
           transition
-          hover:bg-purple-100
-        "
+          ${map 
+            ? "border-green-500 bg-green-50 hover:bg-green-100" 
+            : "border-purple-300 bg-purple-50 hover:bg-purple-100"
+          }
+        `}
       >
         {/* Icon */}
         <div className="flex items-center justify-center w-14 h-14 rounded-full bg-white shadow-md mb-4">
@@ -118,12 +134,25 @@ function CreateRoom() {
         </div>
 
         {/* Text */}
-        <p className="text-gray-800 font-semibold text-center">
-          Drag and drop your custom map
-        </p>
-        <p className="text-gray-500 text-sm">
-          or click to browse local files
-        </p>
+        {map ? (
+          <>
+            <p className="text-green-600 font-semibold text-center">
+              Map uploaded successfully!
+            </p>
+            <p className="text-gray-500 text-sm">
+              Click to choose a different map
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-gray-800 font-semibold text-center">
+              Drag and drop your custom map
+            </p>
+            <p className="text-gray-500 text-sm">
+              or click to browse local files
+            </p>
+          </>
+        )}
 
         {/* Hidden input */}
         <input
