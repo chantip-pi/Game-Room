@@ -19,7 +19,7 @@ function GameRoom() {
   const [isJoined, setIsJoined] = useState(false);
   const [copied, setCopied] = useState(false);
   const [mapUrl, setMapUrl] = useState(null);
-  const [gameAreaSize, setGameAreaSize] = useState({ width: 800, height: 600 });
+  const [gameAreaSize, setGameAreaSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
 
@@ -208,8 +208,8 @@ function GameRoom() {
         </div>
       )}
 
-      <div className="flex" style={{ height: 'calc(100vh - 73px)' }}>
-        <div className="flex-1 p-6" ref={gameAreaRef}>
+      <div className="grid grid-cols-12" style={{ height: 'calc(100vh - 73px)' }}>
+        <div className="col-span-9 p-6" ref={gameAreaRef}>
           <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
@@ -229,7 +229,7 @@ function GameRoom() {
           </div>
         </div>
 
-        <div className="w-80 bg-white border-l border-[#EFDBFF] flex flex-col">
+        <div className="col-span-3 bg-white border-l border-[#EFDBFF] flex flex-col">
           <h3 className="px-4 py-3 font-semibold border-b border-[#EFDBFF] text-gray-700">Chat</h3>
           <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(100vh - 300px)' }}>
             {messages.map((msg, index) => (

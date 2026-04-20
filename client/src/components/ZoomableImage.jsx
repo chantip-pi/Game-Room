@@ -5,9 +5,7 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight }) => {
   const [image, setImage] = useState(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const stageRef = useRef(null);
+    const stageRef = useRef(null);
 
   useEffect(() => {
     if (imageUrl) {
@@ -56,27 +54,6 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight }) => {
     
     setScale(clampedScale);
     setPosition(newPos);
-  };
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({
-      x: e.evt.clientX - position.x,
-      y: e.evt.clientY - position.y,
-    });
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDragging) {
-      setPosition({
-        x: e.evt.clientX - dragStart.x,
-        y: e.evt.clientY - dragStart.y,
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
   };
 
   const resetZoom = () => {
@@ -147,12 +124,8 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight }) => {
         x={position.x}
         y={position.y}
         onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
         ref={stageRef}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        style={{ cursor: 'default' }}
       >
         <Layer>
           <KonvaImage
