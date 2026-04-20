@@ -1,7 +1,7 @@
 const roomService = require('../services/RoomService');
 
 function registerRoomHandlers(io, socket) {
-  socket.on('create_room', ({ username, dice, playerCount, turnLimit, mapDataUrl, mapPublicId } = {}) => {
+  socket.on('create_room', ({ username, dice, playerCount, turnLimit, mapDataUrl, mapPublicId, profileImage } = {}) => {
     if (!username) {
       return socket.emit('error', { message: 'Username is required.' });
     }
@@ -10,7 +10,7 @@ function registerRoomHandlers(io, socket) {
       return socket.emit('error', { message: 'Map image is required to create a room.' });
     }
 
-    const roomCode = roomService.createRoom(username, { dice, playerCount, turnLimit, mapDataUrl, mapPublicId });
+    const roomCode = roomService.createRoom(username, { dice, playerCount, turnLimit, mapDataUrl, mapPublicId, profileImage });
 
     socket.join(roomCode);
     socket.username = username;
@@ -26,10 +26,15 @@ function registerRoomHandlers(io, socket) {
     const roomInfo = roomService.getRoomInfo(roomCode);
     socket.emit('room_info', roomInfo);
 
+    // Broadcast profile image to all users in room
+    if (profileImage) {
+      io.to(roomCode).emit('user_profile_update', { username, profileImage });
+    }
+
     console.log(`Room ${roomCode} created by ${username}`);
   });
 
-  socket.on('join_room', ({ username, room } = {}) => {
+  socket.on('join_room', ({ username, room, profileImage } = {}) => {
     if (!username || !room) {
       return socket.emit('error', { message: 'Username and room code are required.' });
     }
@@ -58,6 +63,18 @@ function registerRoomHandlers(io, socket) {
     const roomInfo = roomService.getRoomInfo(room);
     socket.emit('room_info', roomInfo);
 
+    // Broadcast profile image to all users in room
+    if (profileImage) {
+      roomService.setUserProfile(room, username, profileImage);
+      io.to(room).emit('user_profile_update', { username, profileImage });
+    }
+
+    // Send existing user profiles to new user
+    const existingProfiles = roomService.getUserProfiles(room);
+    if (existingProfiles && Object.keys(existingProfiles).length > 0) {
+      socket.emit('existing_user_profiles', { profiles: existingProfiles });
+    }
+
     console.log(`${username} joined room ${room}`);
   });
 
@@ -70,6 +87,10 @@ function registerRoomHandlers(io, socket) {
     
     socket.leave(room);
     socket.to(room).emit('user_left', { username });
+    
+    // Clean up user profile when leaving
+    roomService.removeUserProfile(room, username);
+    io.to(room).emit('user_profile_remove', { username });
     
     if (!result.roomDeleted) {
       io.to(room).emit('update_users', result.users);

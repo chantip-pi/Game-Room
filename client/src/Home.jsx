@@ -7,43 +7,22 @@ import socketManager from "./utils/socketManager";
 
 function Home() {
   const [room, setRoom] = useState("");
-  const [username, setUsername] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    socketManager.connect();
-
-    socketManager.on("room_joined", (data) => {
-      setIsJoining(false);
-      navigate(`/gameroom?room=${room}&username=${username}`);
-    });
-
-    socketManager.on("error", (data) => {
-      setIsJoining(false);
-      setError(data.message);
-    });
-
-    return () => {
-      socketManager.off("room_joined");
-      socketManager.off("error");
-    };
-  }, [room, username, navigate]);
+    // Socket connection will be handled in UserSettings
+  }, []);
 
   const joinRoom = () => {
     if (!room.trim()) {
       setError("Please enter a room code");
       return;
     }
-    if (!username.trim()) {
-      setError("Please enter your name");
-      return;
-    }
 
-    setIsJoining(true);
     setError("");
-    socketManager.emit("join_room", { username, room });
+    navigate(`/usersettings?room=${room}`);
   };
 
   return (
@@ -74,15 +53,6 @@ function Home() {
 
         <input
           type="text"
-          placeholder="ENTER YOUR NAME"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="input-field input-animation"
-          disabled={isJoining}
-        />
-
-        <input
-          type="text"
           placeholder="ENTER ROOM CODE"
           value={room}
           onChange={(e) => setRoom(e.target.value)}
@@ -90,7 +60,7 @@ function Home() {
           disabled={isJoining}
         />
         <button onClick={joinRoom} className="rounded-4xl bg-[#6A1CF6] text-white p-4 font-bold flex items-center justify-center gap-2 button-hover" disabled={isJoining}>
-          <div>{isJoining ? "Joining..." : "Join Game"}</div>
+          <div>{isJoining ? "Processing..." : "Join Game"}</div>
           <FaArrowRight />
         </button>
 
@@ -101,7 +71,7 @@ function Home() {
         <div className="border-t border-gray-300 flex-grow ml-3 divider-animation"></div>
       </div>
       <div>
-        <Link to="/createroom" className="rounded-4xl bg-white text-white p-4 font-bold flex items-center justify-center shadow-lg gap-2 create-room-animation">
+        <Link to="/usersettings?creating=true" className="rounded-4xl bg-white text-white p-4 font-bold flex items-center justify-center shadow-lg gap-2 create-room-animation">
           <div className="bg-[#FDD400] rounded-4xl p-3">
            <div className="text-gray-700">
             <LuCirclePlus />

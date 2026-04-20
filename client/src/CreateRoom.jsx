@@ -1,16 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LuCirclePlus, LuMessageCircleWarning } from "react-icons/lu";
 import { FaDiceD20, FaDiceD6 } from "react-icons/fa";
 import { GiD12 } from "react-icons/gi";
 import { useRef } from "react";
 import { FiUploadCloud } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
-// import { uploadImageUnsigned } from "./utils/cloudinaryUpload";
 
 function CreateRoom() {
-
-  const [username, setUsername] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
   const [dice, setDice] = useState("D6");
@@ -19,6 +16,9 @@ function CreateRoom() {
   const [map, setMap] = useState(null);
   const navigate = useNavigate();
   const inputRef = useRef(null);
+  const [searchParams] = useSearchParams();
+  const userDataParam = searchParams.get("userData");
+  const [userData, setUserData] = useState(null);
 
   const dices = [
     { id: "D6", icon: <FaDiceD6 size={32} /> },
@@ -28,12 +28,29 @@ function CreateRoom() {
   const players = [4, 5, 6, 7, 8];
 
   useEffect(() => {
+    // Parse user data if coming from UserSettings
+    if (userDataParam) {
+      try {
+        const parsedUserData = JSON.parse(decodeURIComponent(userDataParam));
+        setUserData(parsedUserData);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        navigate('/');
+        return;
+      }
+    } else {
+      // If no user data, redirect to UserSettings
+      navigate('/usersettings?creating=true');
+      return;
+    }
+
     socketManager.connect();
 
     socketManager.on("room_created", (data) => {
       setIsCreating(false);
-      // Navigate to game room - map will be loaded via room_info event
-      navigate(`/gameroom?room=${data.roomCode}&username=${username}`);
+      // Navigate to game room with user data
+      const profileImageParam = userData.profileImage ? encodeURIComponent(userData.profileImage) : '';
+      navigate(`/gameroom?room=${data.roomCode}&username=${userData.username}&profileImage=${profileImageParam}`);
     });
 
     socketManager.on("error", (data) => {
@@ -45,11 +62,11 @@ function CreateRoom() {
       socketManager.off("room_created");
       socketManager.off("error");
     };
-  }, [username, navigate]);
+  }, [userDataParam, navigate, userData?.username]);
 
   const handleCreateRoom = () => {
-    if (!username.trim()) {
-      setError("Please enter your name");
+    if (!userData || !userData.username.trim()) {
+      setError("User data not found. Please go back and set up your profile.");
       return;
     }
     
@@ -65,7 +82,14 @@ function CreateRoom() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const mapDataUrl = e.target.result;
-      socketManager.emit("create_room", { username, dice, playerCount, turnLimit, mapDataUrl });
+      socketManager.emit("create_room", { 
+        username: userData.username, 
+        dice, 
+        playerCount, 
+        turnLimit, 
+        mapDataUrl,
+        profileImage: userData.profileImage
+      });
     };
     reader.readAsDataURL(map);
   };
@@ -173,17 +197,7 @@ function CreateRoom() {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-800">PLAYER NAME</label>
-            <input
-              type="text"
-              placeholder="ENTER YOUR NAME"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="input-field input-animation bg-white"
-              disabled={isCreating}
-            />
-          </div>
+          
 
           <div>
             <h3 className="text-lg font-semibold mb-3 text-gray-700">ROOM SETTINGS</h3>

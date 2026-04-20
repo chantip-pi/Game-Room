@@ -12,6 +12,7 @@ function GameRoom() {
   const room = searchParams.get("room") || "";
   const username = searchParams.get("username") || "";
   const mapDataParam = searchParams.get("mapData") || "";
+  const profileImageParam = searchParams.get("profileImage") || "";
 
   const [messages, setMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
@@ -22,6 +23,7 @@ function GameRoom() {
   const [mapUrl, setMapUrl] = useState(null);
   const [gameAreaSize, setGameAreaSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [userPawns, setUserPawns] = useState({});
+  const [userProfiles, setUserProfiles] = useState({});
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
 
@@ -40,12 +42,43 @@ function GameRoom() {
     }
 
     // Join the room
-    socketManager.emit("join_room", { username, room });
+    socketManager.emit("join_room", { username, room, profileImage: userProfiles[username] });
 
     // Listen for socket events
     socketManager.on("room_joined", (data) => {
       setIsJoined(true);
       setError("");
+    });
+
+    // Listen for profile image updates
+    socketManager.on("user_profile_update", (data) => {
+      if (data.username !== username) {
+        setUserProfiles(prev => ({
+          ...prev,
+          [data.username]: data.profileImage
+        }));
+      }
+    });
+
+    // Listen for existing user profiles when joining
+    socketManager.on("existing_user_profiles", (data) => {
+      if (data.profiles) {
+        setUserProfiles(prev => ({
+          ...prev,
+          ...data.profiles
+        }));
+      }
+    });
+
+    // Listen for user profile removal
+    socketManager.on("user_profile_remove", (data) => {
+      if (data.username !== username) {
+        setUserProfiles(prev => {
+          const newProfiles = { ...prev };
+          delete newProfiles[data.username];
+          return newProfiles;
+        });
+      }
     });
 
     socketManager.on("chat_history", (data) => {
@@ -82,6 +115,9 @@ function GameRoom() {
       socketManager.off("update_users");
       socketManager.off("error");
       socketManager.off("room_info");
+      socketManager.off("user_profile_update");
+      socketManager.off("existing_user_profiles");
+      socketManager.off("user_profile_remove");
     };
   }, [room, username, navigate]);
 
@@ -113,10 +149,27 @@ function GameRoom() {
           setMapUrl(decodedMapUrl);
         }
       } catch (error) {
-        console.error('Error decoding map data from URL:', error);
+        setError('Error decoding map data from URL');
       }
     }
   }, [mapDataParam]);
+
+  // Handle profile image parameter
+  useEffect(() => {
+    if (profileImageParam) {
+      try {
+        const decodedProfileImage = decodeURIComponent(profileImageParam);
+        if (decodedProfileImage && decodedProfileImage !== 'null' && decodedProfileImage !== '') {
+          setUserProfiles(prev => ({
+            ...prev,
+            [username]: decodedProfileImage
+          }));
+        }
+      } catch (error) {
+        setError('Error decoding profile image from URL');
+      }
+    }
+  }, [profileImageParam, username]);
 
   const handleLeaveRoom = () => {
     socketManager.emit("leave_room", { room, username });
@@ -287,6 +340,7 @@ function GameRoom() {
                 containerHeight={gameAreaSize.height - 128} // Account for padding and header
                 userPawns={userPawns}
                 currentUsername={username}
+                userProfiles={userProfiles}
                 onPawnMove={handlePawnMove}
               />
             ) : (

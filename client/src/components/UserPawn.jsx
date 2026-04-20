@@ -1,5 +1,5 @@
-import React from 'react';
-import { Group, Text, Circle, Rect, Path } from 'react-konva';
+import React, { useEffect, useState } from 'react';
+import { Group, Text, Circle, Rect, Path, Image as KonvaImage } from 'react-konva';
 
 const UserPawn = ({
   user,
@@ -10,6 +10,7 @@ const UserPawn = ({
   onDragEnd,
   isCurrentUser,
   imageScale = 1,
+  userProfileImage = null,
 }) => {
   const BASE = 80;
   const size = BASE * imageScale;
@@ -17,6 +18,7 @@ const UserPawn = ({
   const cx = r;
   const cy = r;
   const sc = imageScale;
+  const [profileImageObj, setProfileImageObj] = useState(null);
 
   const COLORS = [
     '#6A1CF6', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
@@ -33,6 +35,24 @@ const UserPawn = ({
   const pillW = labelText.length * Math.round(7 * sc) + pillPad * 3;
   const pillY = size + Math.round(6 * sc);
   const pillX = cx - pillW / 2;
+
+  // Load profile image if provided
+  useEffect(() => {
+    if (userProfileImage) {
+      const img = new window.Image();
+      img.onload = () => {
+        setProfileImageObj(img);
+      };
+      img.onerror = () => {
+        console.error('Failed to load profile image for user:', user);
+        setProfileImageObj(null);
+      };
+      img.crossOrigin = 'anonymous';
+      img.src = userProfileImage;
+    } else {
+      setProfileImageObj(null);
+    }
+  }, [userProfileImage, user]);
 
   return (
     <Group
@@ -62,56 +82,60 @@ const UserPawn = ({
         strokeWidth={Math.round(3 * sc)}
       />
 
-      {/* Main coloured circle */}
-      <Circle
-        x={cx}
-        y={cy}
-        radius={r - Math.round(4 * sc)}
-        fill={color}
-        stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
-        strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
-      />
-
-      {/* Inner highlight — subtle top-left glow for depth */}
-      <Circle
-        x={cx - Math.round(4 * sc)}
-        y={cy - Math.round(5 * sc)}
-        radius={Math.round(6 * sc)}
-        fill="rgba(255,255,255,0.25)"
-        listening={false}
-      />
-
-      {/* User initial */}
-      <Text
-        x={cx}
-        y={cy}
-        text={user.charAt(0).toUpperCase()}
-        fontSize={Math.round(20 * sc)}
-        fontStyle="bold"
-        fill="white"
-        align="center"
-        verticalAlign="middle"
-        offsetX={Math.round(10 * sc)}
-        offsetY={Math.round(11 * sc)}
-        shadowColor="rgba(0,0,0,0.4)"
-        shadowBlur={Math.round(3 * sc)}
-        shadowOffsetY={Math.round(1 * sc)}
-        listening={false}
-      />
-
-      {/* "You" crown indicator */}
-      {isCurrentUser && (
-        <Text
-          x={cx}
-          y={-Math.round(2 * sc)}
-          text="▲"
-          fontSize={Math.round(10 * sc)}
-          fill="#111"
-          align="center"
-          offsetX={Math.round(5 * sc)}
-          offsetY={Math.round(10 * sc)}
-          listening={false}
-        />
+      {/* Main circle - either profile image or colored circle */}
+      {profileImageObj ? (
+        <>
+          {/* White background circle for profile image */}
+          <Circle
+            x={cx}
+            y={cy}
+            radius={r - Math.round(4 * sc)}
+            fill="white"
+            stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
+            strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
+          />
+          {/* Profile image clipped to circle */}
+          <KonvaImage
+            x={cx - (r - Math.round(8 * sc))}
+            y={cy - (r - Math.round(8 * sc))}
+            width={(r - Math.round(8 * sc)) * 2}
+            height={(r - Math.round(8 * sc)) * 2}
+            image={profileImageObj}
+            clipFunc={(ctx) => {
+              ctx.arc(cx, cy, r - Math.round(8 * sc), 0, Math.PI * 2, false);
+              ctx.clip();
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {/* Main coloured circle - fallback when no profile image */}
+          <Circle
+            x={cx}
+            y={cy}
+            radius={r - Math.round(4 * sc)}
+            fill={color}
+            stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
+            strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
+          />
+          {/* User initial - fallback when no profile image */}
+          <Text
+            x={cx}
+            y={cy}
+            text={user.charAt(0).toUpperCase()}
+            fontSize={Math.round(20 * sc)}
+            fontStyle="bold"
+            fill="white"
+            align="center"
+            verticalAlign="middle"
+            offsetX={Math.round(10 * sc)}
+            offsetY={Math.round(11 * sc)}
+            shadowColor="rgba(0,0,0,0.4)"
+            shadowBlur={Math.round(3 * sc)}
+            shadowOffsetY={Math.round(1 * sc)}
+            listening={false}
+          />
+        </>
       )}
 
       {/* Label pill background */}

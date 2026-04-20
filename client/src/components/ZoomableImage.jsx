@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import UserPawn from './UserPawn';
 
-const ZoomableImage = ({ imageUrl, containerWidth, containerHeight, userPawns, currentUsername, onPawnMove }) => {
+const ZoomableImage = ({ imageUrl, containerWidth, containerHeight, userPawns, currentUsername, onPawnMove, userProfiles = {} }) => {
   const [image, setImage] = useState(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -144,6 +144,7 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight, userPawns, c
               user={username}
               position={position}
               isCurrentUser={username === currentUsername}
+              userProfileImage={userProfiles[username] || null}
               onDragStart={() => {}}
               onDragMove={(e) => {
                 if (username === currentUsername && onPawnMove) {

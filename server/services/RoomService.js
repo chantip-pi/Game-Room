@@ -5,6 +5,7 @@ class RoomService {
   constructor() {
     this.roomRepository = roomRepository;
     this.pawnPositions = new Map(); // Store pawn positions by room
+    this.userProfiles = new Map(); // Store user profiles by room
   }
 
   createRoom(username, gameSettings = {}) {
@@ -85,6 +86,35 @@ class RoomService {
       // Clean up empty room entries
       if (roomPawns.size === 0) {
         this.pawnPositions.delete(roomCode);
+      }
+    }
+  }
+
+  // User profile management
+  setUserProfile(roomCode, username, profileImage) {
+    if (!this.userProfiles.has(roomCode)) {
+      this.userProfiles.set(roomCode, new Map());
+    }
+    this.userProfiles.get(roomCode).set(username, profileImage);
+  }
+
+  getUserProfile(roomCode, username) {
+    const roomProfiles = this.userProfiles.get(roomCode);
+    return roomProfiles ? roomProfiles.get(username) : null;
+  }
+
+  getUserProfiles(roomCode) {
+    const roomProfiles = this.userProfiles.get(roomCode);
+    return roomProfiles ? Object.fromEntries(roomProfiles) : {};
+  }
+
+  removeUserProfile(roomCode, username) {
+    const roomProfiles = this.userProfiles.get(roomCode);
+    if (roomProfiles) {
+      roomProfiles.delete(username);
+      // Clean up empty room entries
+      if (roomProfiles.size === 0) {
+        this.userProfiles.delete(roomCode);
       }
     }
   }
