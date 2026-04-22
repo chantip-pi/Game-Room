@@ -1,16 +1,28 @@
 class UserRepository {
   constructor() {
-    this._roomUsers = new Map();
-    this._userProfiles = new Map();
+    this._roomUsers = new Map(); // roomCode -> Map(username -> userData)
+    this._userProfiles = new Map(); // roomCode -> Map(username -> profileImage)
   }
 
   // --- User Management ---
 
-  addUser(roomCode, username) {
+  addUser(roomCode, userData) {
     if (!this._roomUsers.has(roomCode)) {
-      this._roomUsers.set(roomCode, new Set());
+      this._roomUsers.set(roomCode, new Map());
     }
-    this._roomUsers.get(roomCode).add(username);
+    this._roomUsers.get(roomCode).set(userData.username, userData);
+  }
+
+  getUser(roomCode, username) {
+    const roomUsers = this._roomUsers.get(roomCode);
+    return roomUsers ? roomUsers.get(username) : null;
+  }
+
+  updateUser(roomCode, username, userData) {
+    const roomUsers = this._roomUsers.get(roomCode);
+    if (roomUsers) {
+      roomUsers.set(username, userData);
+    }
   }
 
   removeUser(roomCode, username) {
@@ -21,7 +33,8 @@ class UserRepository {
   }
 
   getUsersInRoom(roomCode) {
-    return Array.from(this._roomUsers.get(roomCode) ?? []);
+    const roomUsers = this._roomUsers.get(roomCode);
+    return roomUsers ? Array.from(roomUsers.values()) : [];
   }
 
   getRoomUserCount(roomCode) {

@@ -1,4 +1,5 @@
 const roomService = require('../services/RoomService');
+const userService = require('../services/UserService');
 const imageService = require('../services/ImageService');
 const { Message, User } = require('../models/index');
 
@@ -9,9 +10,7 @@ function registerRoomHandlers(io, socket) {
         return socket.emit('error', { message: 'Username is required.' });
       }
       
-      if (!mapDataUrl) {
-        return socket.emit('error', { message: 'Map image is required to create a room.' });
-      }
+      // Map image is now optional - will be uploaded separately
 
       const roomCode = roomService.createRoom(username, { 
         dice, 
@@ -34,7 +33,12 @@ function registerRoomHandlers(io, socket) {
       
       // Send room info including map data to creator
       const roomInfo = roomService.getRoomInfo(roomCode);
-      socket.emit('room_info', roomInfo);
+      // Ensure mapDataUrl is set for frontend compatibility
+      const roomInfoForFrontend = {
+        ...roomInfo,
+        mapDataUrl: roomInfo.mapImage || roomInfo.gameSettings?.mapDataUrl
+      };
+      socket.emit('room_info', roomInfoForFrontend);
 
       // Create and send system message
       const createMessage = Message.createSystemMessage(
@@ -44,8 +48,8 @@ function registerRoomHandlers(io, socket) {
       roomService.addMessage(roomCode, createMessage);
       io.to(roomCode).emit('receive_message', createMessage.toJSON());
 
-      // Broadcast profile image to all users in room
-      if (profileImage) {
+      // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
+      if (profileImage && !profileImage.startsWith('blob:')) {
         io.to(roomCode).emit('user_profile_update', { username, profileImage });
       }
 
@@ -62,10 +66,30 @@ function registerRoomHandlers(io, socket) {
         return socket.emit('error', { message: 'Username and room code are required.' });
       }
 
-      roomService.joinRoom(room, username.trim());
-
-      // Create user model instance
-      const user = new User(username.trim(), socket.id, profileImage);
+      const trimmedUsername = username.trim();
+      
+      // Only add user if they're not already in the room
+      if (!userService.userExistsInRoom(room, trimmedUsername)) {
+        console.log(`Adding new user ${trimmedUsername} to room ${room} with socket ${socket.id}`);
+        
+        // Handle profile image upload if it's a blob URL
+        let finalProfileImage = profileImage;
+        if (profileImage && profileImage.startsWith('blob:')) {
+          // This shouldn't happen with our current frontend, but handle it just in case
+          console.log(`Warning: Received blob URL for ${trimmedUsername}, this should be handled on frontend`);
+          finalProfileImage = null; // Don't store blob URLs
+        }
+        
+        // Add user to room with socket ID and profile
+        userService.joinRoom(room, trimmedUsername, socket.id, finalProfileImage);
+      } else {
+        console.log(`Updating existing user ${trimmedUsername} in room ${room} with socket ${socket.id}`);
+        // Update existing user's socket ID and profile
+        userService.updateUserSocket(room, trimmedUsername, socket.id);
+        if (profileImage && !profileImage.startsWith('blob:')) {
+          userService.setUserProfile(room, trimmedUsername, profileImage);
+        }
+      }
 
       socket.join(room);
       socket.username = username;
@@ -74,7 +98,11 @@ function registerRoomHandlers(io, socket) {
       const users = roomService.getUsersInRoom(room);
       const messageHistory = roomService.getMessageHistory(room);
 
-      socket.to(room).emit('user_joined', { username, timestamp: new Date() });
+      // Only emit user_joined if this is a new connection (not a reconnection)
+      const existingUser = users.find(u => u.username === trimmedUsername);
+      if (!existingUser || !existingUser.isActive) {
+        socket.to(room).emit('user_joined', { username, timestamp: new Date() });
+      }
       io.to(room).emit('update_users', users);
       
       // Send chat history to newly joined user
@@ -83,7 +111,12 @@ function registerRoomHandlers(io, socket) {
       
       // Send room info including map data
       const roomInfo = roomService.getRoomInfo(room);
-      socket.emit('room_info', roomInfo);
+      // Ensure mapDataUrl is set for frontend compatibility
+      const roomInfoForFrontend = {
+        ...roomInfo,
+        mapDataUrl: roomInfo.mapImage || roomInfo.gameSettings?.mapDataUrl
+      };
+      socket.emit('room_info', roomInfoForFrontend);
 
       // Create and send system message for user joining
       const joinMessage = Message.createSystemMessage(
@@ -93,8 +126,9 @@ function registerRoomHandlers(io, socket) {
       roomService.addMessage(room, joinMessage);
       io.to(room).emit('receive_message', joinMessage.toJSON());
 
-      // Broadcast profile image to all users in room
-      if (profileImage) {
+      // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
+      if (profileImage && !profileImage.startsWith('blob:')) {
+        console.log(`Setting profile image for ${username} in room ${room}: ${profileImage}`);
         roomService.setUserProfile(room, username, profileImage);
         io.to(room).emit('user_profile_update', { username, profileImage });
       }
@@ -182,6 +216,7 @@ function registerRoomHandlers(io, socket) {
       roomService.setUserProfile(socket.room, socket.username, profileData.url);
 
       // Broadcast profile update to room
+      console.log(`Broadcasting profile update for ${socket.username} to room ${socket.room}: ${profileData.url}`);
       io.to(socket.room).emit('user_profile_update', { 
         username: socket.username, 
         profileImage: profileData.url 
@@ -244,6 +279,7 @@ function registerRoomHandlers(io, socket) {
       });
 
       socket.emit('map_image_uploaded', { 
+        roomCode: socket.room,
         url: mapData.url,
         filename: mapData.publicId.split('/').pop()
       });

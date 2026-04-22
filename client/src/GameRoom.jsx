@@ -24,6 +24,7 @@ function GameRoom() {
   const [gameAreaSize, setGameAreaSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [userPawns, setUserPawns] = useState({});
   const [userProfiles, setUserProfiles] = useState({});
+  const [profileImageUploaded, setProfileImageUploaded] = useState(false);
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
 
@@ -41,22 +42,91 @@ function GameRoom() {
       return;
     }
 
-    // Join the room
-    socketManager.emit("join_room", { username, room, profileImage: userProfiles[username] });
+    // Only join room once
+    if (!isJoined) {
+      socketManager.emit("join_room", { username, room });
+    }
+
+    // Handle profile image upload (only once)
+    const handleProfileImageUpload = async () => {
+      // Prevent multiple uploads
+      if (profileImageUploaded) {
+        return;
+      }
+
+      if (!profileImageParam || !profileImageParam.startsWith('blob:')) {
+        // Not a blob URL, use as-is
+        setUserProfiles(prev => ({
+          ...prev,
+          [username]: profileImageParam
+        }));
+        setProfileImageUploaded(true);
+        return;
+      }
+
+      try {
+        // Convert blob to file and upload to server
+        const response = await fetch(profileImageParam);
+        const blob = await response.blob();
+        
+        // Use actual MIME type from blob
+        const actualMimeType = blob.type || 'image/jpeg';
+        const extension = actualMimeType === 'image/png' ? '.png' : '.jpg';
+        const filename = `profile${extension}`;
+        
+        const file = new File([blob], filename, { type: actualMimeType });
+        
+        // Upload profile image to server
+        await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const imageData = e.target.result;
+            socketManager.emit("upload_profile_image", {
+              imageData,
+              filename,
+              mimetype: actualMimeType
+            });
+          };
+          reader.readAsDataURL(file);
+        });
+        
+        setProfileImageUploaded(true);
+      } catch (error) {
+        console.error('Failed to upload profile image:', error);
+      }
+    };
+
+    // Handle profile image upload completion
+    socketManager.on("profile_image_uploaded", (data) => {
+      setUserProfiles(prev => ({
+        ...prev,
+        [username]: data.url
+      }));
+    });
+
+    // Trigger profile image upload when room is joined
+    const handleRoomJoined = () => {
+      setIsJoined(true);
+      setError("");
+      handleProfileImageUpload();
+    };
 
     // Listen for socket events
     socketManager.on("room_joined", (data) => {
-      setIsJoined(true);
-      setError("");
+      handleRoomJoined();
     });
 
     // Listen for profile image updates
     socketManager.on("user_profile_update", (data) => {
+      console.log(`Received profile update for ${data.username}: ${data.profileImage}`);
       if (data.username !== username) {
         setUserProfiles(prev => ({
           ...prev,
           [data.username]: data.profileImage
         }));
+        console.log(`Updated profile for ${data.username} in UI`);
+      } else {
+        console.log(`Ignoring own profile update for ${data.username}`);
       }
     });
 
@@ -93,6 +163,22 @@ function GameRoom() {
       setOnlineUsers(users);
     });
 
+    socketManager.on("user_joined", (data) => {
+      setMessages((prev) => [...prev, {
+        message: `${data.username} joined the room`,
+        type: "system",
+        timestamp: new Date().toISOString()
+      }]);
+    });
+
+    socketManager.on("user_left", (data) => {
+      setMessages((prev) => [...prev, {
+        message: `${data.username} left the room`,
+        type: "system",
+        timestamp: new Date().toISOString()
+      }]);
+    });
+
     socketManager.on("error", (data) => {
       setError(data.message);
       if (data.message.includes("does not exist")) {
@@ -103,6 +189,12 @@ function GameRoom() {
     socketManager.on("room_info", (roomInfo) => {
       if (roomInfo.mapDataUrl) {
         setMapUrl(roomInfo.mapDataUrl);
+      }
+    });
+
+    socketManager.on("map_image_updated", (data) => {
+      if (data.url) {
+        setMapUrl(data.url);
       }
     });
 
@@ -118,6 +210,8 @@ function GameRoom() {
       socketManager.off("user_profile_update");
       socketManager.off("existing_user_profiles");
       socketManager.off("user_profile_remove");
+      socketManager.off("profile_image_uploaded");
+      socketManager.off("map_image_updated");
     };
   }, [room, username, navigate]);
 
@@ -153,23 +247,6 @@ function GameRoom() {
       }
     }
   }, [mapDataParam]);
-
-  // Handle profile image parameter
-  useEffect(() => {
-    if (profileImageParam) {
-      try {
-        const decodedProfileImage = decodeURIComponent(profileImageParam);
-        if (decodedProfileImage && decodedProfileImage !== 'null' && decodedProfileImage !== '') {
-          setUserProfiles(prev => ({
-            ...prev,
-            [username]: decodedProfileImage
-          }));
-        }
-      } catch (error) {
-        setError('Error decoding profile image from URL');
-      }
-    }
-  }, [profileImageParam, username]);
 
   const handleLeaveRoom = () => {
     socketManager.emit("leave_room", { room, username });
@@ -398,7 +475,7 @@ function GameRoom() {
               {onlineUsers.map((user, index) => (
                 <div key={index} className="flex items-center gap-2 text-sm text-gray-600 py-1">
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6A1CF6' }}></span>
-                  {user}
+                  {user.username || user}
                 </div>
               ))}
             </div>

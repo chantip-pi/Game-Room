@@ -4,6 +4,12 @@ const path = require('path');
 const fileType = require('file-type');
 
 // Cloudinary is auto-configured from CLOUDINARY_URL env variable
+// Fallback configuration for development
+if (!process.env.CLOUDINARY_URL) {
+  console.warn('CLOUDINARY_URL environment variable not set. Image uploads will not work.');
+  console.log('Please create a .env file with your Cloudinary credentials:');
+  console.log('CLOUDINARY_URL=cloudinary://YOUR_API_KEY:YOUR_API_SECRET@YOUR_CLOUD_NAME');
+}
 
 
 const ALLOWED_MIME_TYPES = [
@@ -26,7 +32,9 @@ class ImageService {
   async validateFileContent(buffer, mimetype) {
     try {
       // Verify file type using magic numbers
-      const typeInfo = await fileType.fromBuffer(buffer);
+      const typeInfo = await fileType.fileTypeFromBuffer(buffer);
+      
+      console.log(`File validation - Declared MIME: ${mimetype}, Detected MIME: ${typeInfo?.mime}`);
       
       if (!typeInfo) {
         throw new Error('Invalid file format');
@@ -37,9 +45,10 @@ class ImageService {
         throw new Error(`File type ${typeInfo.mime} not allowed`);
       }
       
-      // Check if declared MIME type matches detected type
+      // Check if declared MIME type matches detected type (this was removed by user)
       if (mimetype !== typeInfo.mime) {
-        throw new Error('File MIME type mismatch');
+        console.log(`MIME type mismatch - Declared: ${mimetype}, Detected: ${typeInfo.mime}`);
+        throw new Error(`File MIME type mismatch: declared ${mimetype}, detected ${typeInfo.mime}`);
       }
       
       return true;
@@ -53,12 +62,15 @@ class ImageService {
     const ext = path.extname(filename);
     const name = path.basename(filename, ext);
     const sanitizedName = name.replace(/[^a-zA-Z0-9\-_]/g, '_');
+    console.log(`Starting Cloudinary upload: ${filename} to folder ${sanitizedName}`);
     return `${sanitizedName}${ext}`;
   }
 
   // Helper: upload buffer to Cloudinary
   async uploadToCloudinary(buffer, originalname, folder = 'images', options = {}) {
     const nameWithoutExt = path.basename(originalname, path.extname(originalname));
+
+    console.log(`Starting Cloudinary upload: ${originalname} to folder ${folder}`);
 
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -71,7 +83,11 @@ class ImageService {
           ...options
         },
         (error, result) => {
-          if (error) return reject(error);
+          if (error) {
+            console.error(`Cloudinary upload failed:`, error);
+            return reject(error);
+          }
+          console.log(`Cloudinary upload successful: ${result.public_id} -> ${result.secure_url}`);
           resolve(result);
         }
       );
@@ -84,9 +100,9 @@ class ImageService {
     try {
       await this.validateFileContent(buffer, mimetype);
       
-      const sanitizedName = this.sanitizeFilename(originalname);
+      const sanitizedUsername = this.sanitizeFilename(username);
       const folder = `profiles/${roomCode}`;
-      const result = await this.uploadToCloudinary(buffer, sanitizedName, folder, {
+      const result = await this.uploadToCloudinary(buffer, sanitizedUsername, folder, {
         overwrite: true,
         unique_filename: false
       });
@@ -178,6 +194,35 @@ class ImageService {
     }
   }
 
+  // Delete entire folder from Cloudinary
+  async deleteFolder(folderPath) {
+    try {
+      // Get all resources in the folder
+      const resources = await cloudinary.api.resources({
+        type: 'upload',
+        prefix: folderPath,
+        max_results: 500
+      });
+
+      // Delete all resources in the folder
+      const deletePromises = resources.resources.map(async (resource) => {
+        try {
+          await cloudinary.uploader.destroy(resource.public_id);
+          console.log(`Deleted folder resource: ${resource.public_id}`);
+        } catch (error) {
+          console.error(`Failed to delete folder resource ${resource.public_id}:`, error);
+        }
+      });
+
+      await Promise.all(deletePromises);
+      console.log(`Deleted folder: ${folderPath}`);
+      return { deleted: true, folder: folderPath };
+    } catch (error) {
+      console.error(`Failed to delete folder ${folderPath}:`, error);
+      throw error;
+    }
+  }
+
   // Delete user profile image
   async deleteUserProfile(username) {
     const profile = this.userProfileImages.get(username);
@@ -204,7 +249,13 @@ class ImageService {
       // Delete map image
       await this.deleteMapImage(roomCode);
 
-      // Delete profile images for users in this room
+      // Delete entire profile folder for this room
+      await this.deleteFolder(`profiles/${roomCode}`);
+
+      // Delete entire map folder for this room
+      await this.deleteFolder(`maps/${roomCode}`);
+
+      // Clear local tracking data
       const profilesToDelete = [];
       for (const [username, profile] of this.userProfileImages) {
         if (profile.roomCode === roomCode) {
@@ -213,10 +264,12 @@ class ImageService {
       }
 
       for (const username of profilesToDelete) {
-        await this.deleteUserProfile(username);
+        this.userProfileImages.delete(username);
       }
 
-      console.log(`Cleaned up all images for room ${roomCode}`);
+      this.mapImages.delete(roomCode);
+
+      console.log(`Cleaned up all images and folders for room ${roomCode}`);
     } catch (error) {
       console.error(`Error cleaning up room ${roomCode}:`, error);
     }

@@ -48,7 +48,16 @@ function CreateRoom() {
 
     socketManager.on("room_created", (data) => {
       setIsCreating(false);
-      // Navigate to game room with user data
+      console.log('Room created, uploading map...');
+      
+      // Upload the pending map if it exists
+      if (window.pendingMapUpload) {
+        socketManager.emit("upload_map_image", window.pendingMapUpload);
+        delete window.pendingMapUpload; // Clean up
+      }
+    });
+
+    socketManager.on("map_image_uploaded", (data) => {
       const profileImageParam = userData.profileImage ? encodeURIComponent(userData.profileImage) : '';
       navigate(`/gameroom?room=${data.roomCode}&username=${userData.username}&profileImage=${profileImageParam}`);
     });
@@ -60,6 +69,7 @@ function CreateRoom() {
 
     return () => {
       socketManager.off("room_created");
+      socketManager.off("map_image_uploaded");
       socketManager.off("error");
     };
   }, [userDataParam, navigate, userData?.username]);
@@ -78,18 +88,33 @@ function CreateRoom() {
     setIsCreating(true);
     setError("");
     
-    // Convert map to base64 data URL (temporary fallback)
+    // Upload map to Cloudinary first, then create room
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const mapDataUrl = e.target.result;
-      socketManager.emit("create_room", { 
-        username: userData.username, 
-        dice, 
-        playerCount, 
-        turnLimit, 
-        mapDataUrl,
-        profileImage: userData.profileImage
-      });
+    reader.onload = async (e) => {
+      try {
+        const mapDataUrl = e.target.result;
+        
+        // Store map data for upload after room creation
+        window.pendingMapUpload = {
+          imageData: mapDataUrl,
+          filename: 'map.jpg',
+          mimetype: 'image/jpeg'
+        };
+        
+        // Create room first without map
+        socketManager.emit("create_room", { 
+          username: userData.username, 
+          dice, 
+          playerCount, 
+          turnLimit, 
+          mapDataUrl: null // Will be uploaded separately
+        });
+        
+      } catch (error) {
+        console.error('Error creating room:', error);
+        setError('Failed to create room');
+        setIsCreating(false);
+      }
     };
     reader.readAsDataURL(map);
   };
@@ -144,7 +169,7 @@ function CreateRoom() {
           rounded-2xl
           border-2
           border-dashed
-          cursor-pointer
+          ${isCreating ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
           transition
           ${map 
             ? "border-green-500 bg-green-50 hover:bg-green-100" 
@@ -185,6 +210,7 @@ function CreateRoom() {
           accept="image/png,image/jpeg"
           className="hidden"
           onChange={handleFileSelect}
+          disabled={isCreating}
         />
       </label>
     </div>
@@ -208,11 +234,12 @@ function CreateRoom() {
                 <button
                   key={d.id}
                   onClick={() => setDice(d.id)}
+                  disabled={isCreating}
                   className={`flex flex-col items-center justify-center rounded-lg border p-6 transition-all duration-200
                   ${dice === d.id
                       ? "border-[#6A1CF6] bg-[#6A1CF6] text-white"
                       : "border-gray-200 bg-white hover:border-[#6A1CF6] hover:bg-gray-100"
-                    } focus:outline-none focus:ring-2 focus:ring-[#6A1CF6]`}
+                    } ${isCreating ? "opacity-50 cursor-not-allowed" : ""} focus:outline-none focus:ring-2 focus:ring-[#6A1CF6]`}
                 >
                   {d.icon}
                   <p className="mt-2 font-semibold">{d.id}</p>
@@ -249,6 +276,7 @@ function CreateRoom() {
                     className="input-field input-animation bg-white"
                     min="30"
                     max="600"
+                    disabled={isCreating}
                   />
                   <p className="text-sm text-[#6A1CF6]">SECONDS</p>
                 </div>
@@ -274,6 +302,7 @@ function CreateRoom() {
       <button
         onClick={() => navigate("/")}
         className="px-4 py-2 text-gray-400 hover:text-grey-400 transition-colors duration-200"
+        disabled={isCreating}
       >
         {isCreating ? "Cancel" : "Back"}
       </button>

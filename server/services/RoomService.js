@@ -35,9 +35,6 @@ class RoomService {
       throw new Error('Invalid room code. Room does not exist.');
     }
     
-    // Create user model instance
-    const user = new User(username);
-    
     userService.joinRoom(roomCode, username);
   }
 

@@ -1,56 +1,71 @@
 const roomService = require('../services/RoomService');
 const imageService = require('../services/ImageService');
+const pawnService = require('../services/PawnService');
 const { Message } = require('../models/index');
 
-function disconnectHandler(io, socket) {
+function registerDisconnectHandlers(io, socket) {
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
+    try {
+      const username = socket.username;
+      const room = socket.room;
 
-    if (socket.room && socket.username) {
-      try {
-        // Create system message for user leaving
-        const leaveMessage = Message.createSystemMessage(
-          `${socket.username} has left the room`,
-          socket.room
-        );
-        
-        // Clean up pawn position before leaving
-        roomService.removePawnPosition(socket.room, socket.username);
-        
-        const result = roomService.leaveRoom(socket.room, socket.username);
-        
-        socket.leave(socket.room);
-        
-        // Notify other users
-        socket.to(socket.room).emit('user_left', { 
-          username: socket.username,
-          timestamp: new Date()
-        });
-        
-        // Clean up user profile when leaving
-        roomService.removeUserProfile(socket.room, socket.username);
-        io.to(socket.room).emit('user_profile_remove', { username: socket.username });
-        
-        // Notify about pawn removal
-        socket.to(socket.room).emit('user_left_pawn', { username: socket.username });
-        
-        // Add system message
-        roomService.addMessage(socket.room, leaveMessage);
-        io.to(socket.room).emit('receive_message', leaveMessage.toJSON());
-        
-        if (!result.roomDeleted) {
-          io.to(socket.room).emit('update_users', result.users);
+      if (!username || !room) {
+        return;
+      }
+
+      console.log(`User disconnected: ${socket.id}`);
+
+      // For now, we'll use a simple timeout approach to detect page refresh
+      // If user reconnects within 5 seconds, it's likely a page refresh
+      setTimeout(() => {
+        // Check if user has reconnected
+        const roomUsers = roomService.getUsersInRoom(room);
+        const userStillInRoom = roomUsers.some(user => user.username === username && user.isActive);
+
+        if (userStillInRoom) {
+          console.log(`User ${username} reconnected - likely page refresh, no cleanup needed`);
+          return;
         }
 
-        // Cleanup user images from ImageService
-        imageService.cleanupUser(socket.username);
+        // User didn't reconnect, proceed with cleanup
+        console.log(`User ${username} did not reconnect - cleaning up`);
 
-        console.log(`${socket.username} left room ${socket.room} due to disconnection`);
-      } catch (error) {
-        console.error(`Error handling disconnect for ${socket.username}:`, error);
-      }
+        // Clean up pawn position
+        pawnService.removePawnPosition(room, username);
+
+        // Remove user from room
+        const result = roomService.leaveRoom(room, username);
+
+        // Clean up user profile when disconnecting
+        imageService.cleanupUser(username);
+
+        socket.to(room).emit('user_left', { username, timestamp: new Date() });
+
+        // Broadcast pawn removal to all users in room
+        io.to(room).emit('user_left_pawn', { username });
+
+        // Clean up user profile when leaving
+        io.to(room).emit('user_profile_remove', { username });
+
+        // Create and send system message for user leaving
+        const leaveMessage = Message.createSystemMessage(
+          `${username} left room ${room} due to disconnection`,
+          room
+        );
+
+        if (!result.roomDeleted) {
+          roomService.addMessage(room, leaveMessage);
+          io.to(room).emit('receive_message', leaveMessage.toJSON());
+          io.to(room).emit('update_users', result.users);
+        }
+
+        console.log(`${username} left room ${room} due to disconnection`);
+      }, 5000); // 5 second delay to detect reconnection
+
+    } catch (error) {
+      console.error('Disconnect handler error:', error);
     }
   });
 }
 
-module.exports = disconnectHandler;
+module.exports = registerDisconnectHandlers;

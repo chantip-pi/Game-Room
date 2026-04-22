@@ -8,9 +8,23 @@ class UserService {
   }
 
   joinRoom(roomCode, username, socketId = null, profileImage = null) {
-    // Create user model instance
-    const user = new User(username, socketId, profileImage);
-    this.userRepository.addUser(roomCode, user.toJSON());
+    // Check if user already exists
+    const existingUser = this.userRepository.getUser(roomCode, username);
+    if (existingUser) {
+      // Update existing user instead of creating new one
+      existingUser.socketId = socketId;
+      existingUser.isActive = true;
+      if (profileImage) {
+        existingUser.profileImage = profileImage;
+      }
+      this.userRepository.updateUser(roomCode, username, existingUser);
+      console.log(`Updated existing user ${username} in room ${roomCode}`);
+    } else {
+      // Create new user model instance
+      const user = new User(username, socketId, profileImage);
+      this.userRepository.addUser(roomCode, user.toJSON());
+      console.log(`Created new user ${username} in room ${roomCode}`);
+    }
   }
 
   leaveRoom(roomCode, username) {
@@ -19,13 +33,15 @@ class UserService {
 
   getUsersInRoom(roomCode) {
     const users = this.userRepository.getUsersInRoom(roomCode);
-    // Convert to User models if needed
-    return users.map(userData => {
-      if (userData.username && userData.joinedAt) {
-        return User.fromJSON(userData);
-      }
-      return userData;
-    });
+    // Convert to User models if needed and filter active users only
+    return users
+      .filter(userData => userData.isActive !== false)
+      .map(userData => {
+        if (userData.username && userData.joinedAt) {
+          return User.fromJSON(userData);
+        }
+        return userData;
+      });
   }
 
   // Get users as plain objects for socket emission
@@ -34,7 +50,8 @@ class UserService {
   }
 
   getRoomUserCount(roomCode) {
-    return this.userRepository.getRoomUserCount(roomCode);
+    const users = this.userRepository.getUsersInRoom(roomCode);
+    return users.filter(userData => userData.isActive !== false).length;
   }
 
   userExistsInRoom(roomCode, username) {
@@ -84,11 +101,19 @@ class UserService {
   }
 
   getUserProfile(roomCode, username) {
-    return this.userRepository.getUserProfile(roomCode, username);
+    const user = this.getUser(roomCode, username);
+    return user ? user.profileImage : null;
   }
 
   getUserProfiles(roomCode) {
-    return this.userRepository.getUserProfiles(roomCode);
+    const users = this.getUsersInRoom(roomCode);
+    const profiles = {};
+    users.forEach(user => {
+      if (user.profileImage) {
+        profiles[user.username] = user.profileImage;
+      }
+    });
+    return profiles;
   }
 
   removeUserProfile(roomCode, username) {
