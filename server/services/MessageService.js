@@ -1,5 +1,5 @@
 const messageRepository = require('../repositories/MessageRepository');
-const { Message } = require('../models/Message');
+const { Message } = require('../models/index');
 
 class MessageService {
   constructor() {

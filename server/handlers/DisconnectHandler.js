@@ -1,5 +1,6 @@
 const roomService = require('../services/RoomService');
-const { User, Message } = require('../models');
+const imageService = require('../services/ImageService');
+const { Message } = require('../models/index');
 
 function disconnectHandler(io, socket) {
   socket.on('disconnect', () => {
@@ -40,6 +41,9 @@ function disconnectHandler(io, socket) {
         if (!result.roomDeleted) {
           io.to(socket.room).emit('update_users', result.users);
         }
+
+        // Cleanup user images from ImageService
+        imageService.cleanupUser(socket.username);
 
         console.log(`${socket.username} left room ${socket.room} due to disconnection`);
       } catch (error) {

@@ -1,5 +1,6 @@
 const userRepository = require('../repositories/UserRepository');
-const { User } = require('../models/User');
+const { User } = require('../models/index');
+
 
 class UserService {
   constructor() {
@@ -42,7 +43,7 @@ class UserService {
 
   // Get specific user
   getUser(roomCode, username) {
-    const userData = this.userRepository.getUser(roomCode, username);
+    const userData = this.userRepository.getUserProfile(roomCode, username);
     if (userData) {
       return User.fromJSON(userData);
     }

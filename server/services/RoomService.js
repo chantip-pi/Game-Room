@@ -2,10 +2,9 @@ const roomRepository = require('../repositories/RoomRepository');
 const userService = require('./UserService');
 const messageService = require('./MessageService');
 const pawnService = require('./PawnService');
+const imageService = require('./ImageService');
 const { generateRoomCode } = require('../utils/generateRoomCode');
-const { Message } = require('../models/Message');
-const { User } = require('../models/User');
-const { Room } = require('../models/Room');
+const { Room, User, Message } = require('../models/index');
 
 class RoomService {
   constructor() {
@@ -149,6 +148,7 @@ class RoomService {
     userService.cleanupRoom(roomCode);
     messageService.cleanupRoom(roomCode);
     pawnService.cleanupRoom(roomCode);
+    imageService.cleanupRoom(roomCode);
   }
 }
 

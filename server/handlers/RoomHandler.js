@@ -1,5 +1,6 @@
 const roomService = require('../services/RoomService');
-const { User, Room, Message } = require('../models');
+const imageService = require('../services/ImageService');
+const { Message, User } = require('../models/index');
 
 function registerRoomHandlers(io, socket) {
   socket.on('create_room', ({ username, dice, playerCount, turnLimit, mapDataUrl, mapPublicId, profileImage } = {}) => {
@@ -12,9 +13,6 @@ function registerRoomHandlers(io, socket) {
         return socket.emit('error', { message: 'Map image is required to create a room.' });
       }
 
-      // Create user model instance
-      const user = new User(username.trim(), socket.id, profileImage);
-      
       const roomCode = roomService.createRoom(username, { 
         dice, 
         playerCount, 
@@ -151,6 +149,109 @@ function registerRoomHandlers(io, socket) {
     } catch (error) {
       console.error('Room leave error:', error);
       socket.emit('error', { message: 'Failed to leave room.' });
+    }
+  });
+
+  // Handle profile image upload
+  socket.on('upload_profile_image', async ({ imageData, filename, mimetype } = {}) => {
+    try {
+      if (!socket.username || !socket.room) {
+        return socket.emit('error', { message: 'You must be in a room to upload a profile image.' });
+      }
+
+      if (!imageData || !filename || !mimetype) {
+        return socket.emit('error', { message: 'Image data, filename, and mimetype are required.' });
+      }
+
+      // Convert base64 to buffer
+      const buffer = Buffer.from(imageData.split(',')[1], 'base64');
+      
+      // Validate image size
+      imageService.validateImageSize(buffer);
+
+      // Upload profile image
+      const profileData = await imageService.uploadUserProfile(
+        socket.username,
+        socket.room,
+        buffer,
+        filename,
+        mimetype
+      );
+
+      // Update user profile in room service
+      roomService.setUserProfile(socket.room, socket.username, profileData.url);
+
+      // Broadcast profile update to room
+      io.to(socket.room).emit('user_profile_update', { 
+        username: socket.username, 
+        profileImage: profileData.url 
+      });
+
+      socket.emit('profile_image_uploaded', { 
+        url: profileData.url,
+        filename: profileData.publicId.split('/').pop()
+      });
+
+      console.log(`Profile image uploaded for ${socket.username} in room ${socket.room}`);
+    } catch (error) {
+      console.error('Profile image upload error:', error);
+      socket.emit('error', { message: error.message || 'Failed to upload profile image.' });
+    }
+  });
+
+  // Handle map image upload (room creator only)
+  socket.on('upload_map_image', async ({ imageData, filename, mimetype } = {}) => {
+    try {
+      if (!socket.username || !socket.room) {
+        return socket.emit('error', { message: 'You must be in a room to upload a map image.' });
+      }
+
+      if (!imageData || !filename || !mimetype) {
+        return socket.emit('error', { message: 'Image data, filename, and mimetype are required.' });
+      }
+
+      // Check if user is room creator
+      const roomInfo = roomService.getRoomInfo(socket.room);
+      if (!roomInfo || roomInfo.createdBy !== socket.username) {
+        return socket.emit('error', { message: 'Only room creator can upload map images.' });
+      }
+
+      // Convert base64 to buffer
+      const buffer = Buffer.from(imageData.split(',')[1], 'base64');
+      
+      // Validate image size
+      imageService.validateImageSize(buffer);
+
+      // Upload map image
+      const mapData = await imageService.uploadMapImage(
+        socket.room,
+        socket.username,
+        buffer,
+        filename,
+        mimetype
+      );
+
+      // Update room settings with map image URL
+      roomService.updateRoomSettings(socket.room, {
+        mapDataUrl: mapData.url,
+        mapPublicId: mapData.publicId
+      });
+
+      // Broadcast map update to room
+      io.to(socket.room).emit('map_image_updated', { 
+        url: mapData.url,
+        filename: mapData.publicId.split('/').pop()
+      });
+
+      socket.emit('map_image_uploaded', { 
+        url: mapData.url,
+        filename: mapData.publicId.split('/').pop()
+      });
+
+      console.log(`Map image uploaded for room ${socket.room} by ${socket.username}`);
+    } catch (error) {
+      console.error('Map image upload error:', error);
+      socket.emit('error', { message: error.message || 'Failed to upload map image.' });
     }
   });
 }

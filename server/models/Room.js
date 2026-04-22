@@ -7,6 +7,7 @@ class Room {
     this.users = new Map();
     this.messages = [];
     this.pawnPositions = new Map();
+    this.mapImage = null; 
     this.isActive = true;
   }
 
@@ -59,6 +60,27 @@ class Room {
     this.pawnPositions.delete(username);
   }
 
+
+  setMapImage(url, publicId) {
+    this.mapImage = {
+      url,
+      publicId,
+      uploadedAt: new Date()
+    };
+  }
+
+  getMapImage() {
+    return this.mapImage;
+  }
+
+  removeMapImage() {
+    this.mapImage = null;
+  }
+
+  hasMapImage() {
+    return this.mapImage !== null;
+  }
+
   deactivate() {
     this.isActive = false;
   }
@@ -72,6 +94,7 @@ class Room {
       users: Array.from(this.users.values()).map(user => user.toJSON()),
       messages: this.messages,
       pawnPositions: this.getAllPawnPositions(),
+      mapImage: this.mapImage,
       isActive: this.isActive,
       userCount: this.getUserCount()
     };
@@ -93,6 +116,11 @@ class Room {
     
     // Restore pawn positions
     room.pawnPositions = new Map(Object.entries(data.pawnPositions));
+    
+    // Restore map image
+    if (data.mapImage) {
+      room.mapImage = data.mapImage;
+    }
     
     return room;
   }

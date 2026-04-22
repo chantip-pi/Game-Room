@@ -16,6 +16,41 @@ class User {
     this.profileImage = profileImage;
   }
 
+ 
+  setProfileImage(url, publicId = null) {
+    this.profileImage = {
+      url,
+      publicId,
+      updatedAt: new Date()
+    };
+  }
+
+  getProfileImage() {
+    return this.profileImage;
+  }
+
+  hasProfileImage() {
+    return this.profileImage !== null;
+  }
+
+  removeProfileImage() {
+    this.profileImage = null;
+  }
+
+  getProfileImageUrl() {
+    if (!this.profileImage) return null;
+    
+    if (typeof this.profileImage === 'string') {
+      return this.profileImage;
+    }
+    
+    if (this.profileImage.url) {
+      return this.profileImage.url;
+    }
+    
+    return null;
+  }
+
   deactivate() {
     this.isActive = false;
     this.socketId = null;

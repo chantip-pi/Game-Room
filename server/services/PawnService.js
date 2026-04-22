@@ -1,5 +1,6 @@
 const pawnRepository = require('../repositories/PawnRepository');
-const { Pawn } = require('../models/Pawn');
+const { Pawn } = require('../models/index');
+
 
 class PawnService {
   constructor() {

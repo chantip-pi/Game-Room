@@ -1,5 +1,5 @@
 const pawnService = require('../services/PawnService');
-const { Pawn } = require('../models');
+const { Pawn } = require('../models/index');
 
 const pawnHandler = (io, socket) => {
   // Handle pawn position updates

@@ -1,6 +1,12 @@
 const messageService = require('../services/MessageService');
-const { Message } = require('../models');
+const { Message } = require('../models/index');
 
+/**
+ * Register message handlers for a socket connection.
+ * 
+ * @param {object} io - The io object from the socket library.
+ * @param {object} socket - The socket object.
+ */
 function registerMessageHandlers(io, socket) {
   socket.on('send_message', (data = {}) => {
     const { room, message, username } = data;
