@@ -55,7 +55,17 @@ function UserSettings() {
       navigate(`/createroom?userData=${encodeURIComponent(JSON.stringify(userData))}`);
     } else {
       // Joining room flow - proceed to game room
-      const profileImageParam = profileImage ? encodeURIComponent(profileImage) : '';
+      let profileImageParam = '';
+      if (profileImage) {
+        if (profileImage instanceof File) {
+          // Convert File object to blob URL
+          profileImageParam = encodeURIComponent(URL.createObjectURL(profileImage));
+          console.log('Converted File object to blob URL for navigation');
+        } else {
+          // Use existing URL or string
+          profileImageParam = encodeURIComponent(profileImage);
+        }
+      }
       navigate(`/gameroom?room=${room}&username=${username.trim()}&profileImage=${profileImageParam}`);
     }
   };

@@ -44,29 +44,59 @@ function GameRoom() {
 
     // Only join room once
     if (!isJoined) {
-      socketManager.emit("join_room", { username, room });
+      console.log(`Emitting join_room for ${username} with profileImage: ${profileImageParam ? 'YES (' + profileImageParam.substring(0, 50) + '...)' : 'NO'}`);
+      socketManager.emit("join_room", { username, room, profileImage: profileImageParam });
     }
 
     // Handle profile image upload (only once)
     const handleProfileImageUpload = async () => {
+      console.log(`Profile image upload triggered for ${username}, profileImageParam: ${profileImageParam ? 'YES (' + profileImageParam.substring(0, 50) + '...)' : 'NO'}, alreadyUploaded: ${profileImageUploaded}`);
+      
       // Prevent multiple uploads
       if (profileImageUploaded) {
+        console.log(`Profile image already uploaded for ${username}, skipping`);
         return;
       }
 
-      if (!profileImageParam || !profileImageParam.startsWith('blob:')) {
+      let blobUrl = profileImageParam;
+
+      // Handle File objects (including string representations from URL params)
+      if (profileImageParam) {
+        // Check if it's a string representation of a File object
+        if (typeof profileImageParam === 'string' && profileImageParam.includes('[object File]')) {
+          console.log(`Detected File object string representation for ${username} - this shouldn't happen, skipping upload`);
+          // This is a string representation, not a real File object
+          setUserProfiles(prev => ({
+            ...prev,
+            [username]: null
+          }));
+          setProfileImageUploaded(true);
+          return;
+        }
+        
+        // Check if it's an actual File object
+        if (profileImageParam instanceof File) {
+          console.log(`Converting File object to blob URL for ${username}`);
+          blobUrl = URL.createObjectURL(profileImageParam);
+          console.log(`Created blob URL: ${blobUrl}`);
+        }
+      }
+
+      if (!blobUrl || !blobUrl.startsWith('blob:')) {
+        console.log(`Profile image for ${username} is not a blob URL, using as-is: ${blobUrl}`);
         // Not a blob URL, use as-is
         setUserProfiles(prev => ({
           ...prev,
-          [username]: profileImageParam
+          [username]: blobUrl
         }));
         setProfileImageUploaded(true);
         return;
       }
 
+      console.log(`Starting profile image upload for ${username} from blob URL`);
       try {
         // Convert blob to file and upload to server
-        const response = await fetch(profileImageParam);
+        const response = await fetch(blobUrl);
         const blob = await response.blob();
         
         // Use actual MIME type from blob
@@ -76,21 +106,26 @@ function GameRoom() {
         
         const file = new File([blob], filename, { type: actualMimeType });
         
+        console.log(`Uploading profile image for ${username}: ${filename}, type: ${actualMimeType}`);
+        
         // Upload profile image to server
         await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             const imageData = e.target.result;
+            console.log(`Emitting upload_profile_image for ${username}`);
             socketManager.emit("upload_profile_image", {
               imageData,
               filename,
               mimetype: actualMimeType
             });
+            resolve();
           };
           reader.readAsDataURL(file);
         });
         
         setProfileImageUploaded(true);
+        console.log(`Profile image upload initiated for ${username}`);
       } catch (error) {
         console.error('Failed to upload profile image:', error);
       }

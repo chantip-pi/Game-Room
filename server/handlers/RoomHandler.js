@@ -68,6 +68,8 @@ function registerRoomHandlers(io, socket) {
 
       const trimmedUsername = username.trim();
       
+      console.log(`User ${trimmedUsername} joining room ${room} with profileImage: ${profileImage ? 'YES (' + profileImage.substring(0, 50) + '...)' : 'NO'}`);
+      
       // Only add user if they're not already in the room
       if (!userService.userExistsInRoom(room, trimmedUsername)) {
         console.log(`Adding new user ${trimmedUsername} to room ${room} with socket ${socket.id}`);
