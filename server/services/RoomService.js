@@ -1,11 +1,18 @@
 const roomRepository = require('../repositories/RoomRepository');
+const userService = require('./UserService');
+const messageService = require('./MessageService');
+const pawnService = require('./PawnService');
 const { generateRoomCode } = require('../utils/generateRoomCode');
+const { Message } = require('../models/Message');
+const { User } = require('../models/User');
+const { Room } = require('../models/Room');
 
 class RoomService {
   constructor() {
     this.roomRepository = roomRepository;
-    this.pawnPositions = new Map(); // Store pawn positions by room
-    this.userProfiles = new Map(); // Store user profiles by room
+    this.userService = userService;
+    this.messageService = messageService;
+    this.pawnService = pawnService;
   }
 
   createRoom(username, gameSettings = {}) {
@@ -14,8 +21,12 @@ class RoomService {
       roomCode = generateRoomCode();
     } while (roomRepository.roomExists(roomCode));
 
-    roomRepository.createRoom(roomCode, { createdBy: username, ...gameSettings });
-    roomRepository.addUser(roomCode, username);
+    // Create room model instance
+    const room = new Room(roomCode, username, gameSettings);
+    
+    // Store room data
+    roomRepository.createRoom(roomCode, room.toJSON());
+    userService.joinRoom(roomCode, username);
 
     return roomCode;
   }
@@ -24,99 +35,120 @@ class RoomService {
     if (!roomRepository.roomExists(roomCode)) {
       throw new Error('Invalid room code. Room does not exist.');
     }
-    roomRepository.addUser(roomCode, username);
+    
+    // Create user model instance
+    const user = new User(username);
+    
+    userService.joinRoom(roomCode, username);
   }
 
   leaveRoom(roomCode, username) {
     // Clean up pawn position
-    this.removePawnPosition(roomCode, username);
+    pawnService.removePawnPosition(roomCode, username);
     
-    roomRepository.removeUser(roomCode, username);
+    userService.leaveRoom(roomCode, username);
 
-    const isEmpty = roomRepository.getRoomUserCount(roomCode) === 0;
+    const isEmpty = userService.getRoomUserCount(roomCode) === 0;
     if (isEmpty) {
       // Delete the room
       roomRepository.deleteRoom(roomCode);
       
-      // Clean up pawn positions for this room
-      this.pawnPositions.delete(roomCode);
+      // Clean up all related data for this room
+      this.cleanupRoom(roomCode);
       
       return { roomDeleted: true };
     }
 
     return {
       roomDeleted: false,
-      users: roomRepository.getUsersInRoom(roomCode),
+      users: userService.getUsersInRoom(roomCode),
     };
   }
 
   getUsersInRoom(roomCode) {
-    return roomRepository.getUsersInRoom(roomCode);
+    return userService.getUsersInRoom(roomCode);
   }
 
   addMessage(roomCode, message) {
-    roomRepository.addMessage(roomCode, message);
+    // Handle both Message model and plain object
+    const messageData = message instanceof Message ? message.toJSON() : message;
+    messageService.addMessage(roomCode, messageData);
   }
 
   getMessageHistory(roomCode) {
-    return roomRepository.getMessages(roomCode);
+    return messageService.getMessages(roomCode);
   }
 
   getRoomInfo(roomCode) {
-    return roomRepository.getRoomInfo(roomCode);
+    const roomData = roomRepository.getRoomInfo(roomCode);
+    if (roomData) {
+      // Convert to Room model if needed
+      return roomData;
+    }
+    return null;
   }
 
-  // Pawn position management
+  // Pawn position management - delegate to PawnService
   updatePawnPosition(roomCode, username, position) {
-    if (!this.pawnPositions.has(roomCode)) {
-      this.pawnPositions.set(roomCode, new Map());
-    }
-    this.pawnPositions.get(roomCode).set(username, position);
+    pawnService.updatePawnPosition(roomCode, username, position);
   }
 
   getPawnPositions(roomCode) {
-    const roomPawns = this.pawnPositions.get(roomCode);
-    return roomPawns ? Object.fromEntries(roomPawns) : {};
+    return pawnService.getPawnPositions(roomCode);
   }
 
   removePawnPosition(roomCode, username) {
-    const roomPawns = this.pawnPositions.get(roomCode);
-    if (roomPawns) {
-      roomPawns.delete(username);
-      // Clean up empty room entries
-      if (roomPawns.size === 0) {
-        this.pawnPositions.delete(roomCode);
-      }
-    }
+    pawnService.removePawnPosition(roomCode, username);
   }
 
-  // User profile management
+  // User profile management - delegate to UserService
   setUserProfile(roomCode, username, profileImage) {
-    if (!this.userProfiles.has(roomCode)) {
-      this.userProfiles.set(roomCode, new Map());
-    }
-    this.userProfiles.get(roomCode).set(username, profileImage);
+    userService.setUserProfile(roomCode, username, profileImage);
   }
 
   getUserProfile(roomCode, username) {
-    const roomProfiles = this.userProfiles.get(roomCode);
-    return roomProfiles ? roomProfiles.get(username) : null;
+    return userService.getUserProfile(roomCode, username);
   }
 
   getUserProfiles(roomCode) {
-    const roomProfiles = this.userProfiles.get(roomCode);
-    return roomProfiles ? Object.fromEntries(roomProfiles) : {};
+    return userService.getUserProfiles(roomCode);
   }
 
   removeUserProfile(roomCode, username) {
-    const roomProfiles = this.userProfiles.get(roomCode);
-    if (roomProfiles) {
-      roomProfiles.delete(username);
-      // Clean up empty room entries
-      if (roomProfiles.size === 0) {
-        this.userProfiles.delete(roomCode);
-      }
+    userService.removeUserProfile(roomCode, username);
+  }
+
+  // Get room as Room model instance
+  getRoom(roomCode) {
+    const roomData = roomRepository.getRoomInfo(roomCode);
+    if (roomData) {
+      return Room.fromJSON(roomData);
     }
+    return null;
+  }
+
+  // Update room settings
+  updateRoomSettings(roomCode, settings) {
+    const room = this.getRoom(roomCode);
+    if (room) {
+      Object.assign(room.gameSettings, settings);
+      roomRepository.updateRoomInfo(roomCode, room.toJSON());
+      return room;
+    }
+    return null;
+  }
+
+  // Check if room is full
+  isRoomFull(roomCode, maxPlayers = 4) {
+    const userCount = userService.getRoomUserCount(roomCode);
+    return userCount >= maxPlayers;
+  }
+
+  // Cleanup method for room deletion
+  cleanupRoom(roomCode) {
+    userService.cleanupRoom(roomCode);
+    messageService.cleanupRoom(roomCode);
+    pawnService.cleanupRoom(roomCode);
   }
 }
 
