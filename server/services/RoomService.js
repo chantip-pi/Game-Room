@@ -14,7 +14,7 @@ class RoomService {
     this.pawnService = pawnService;
   }
 
-  createRoom(username, gameSettings = {}) {
+  createRoom(username, gameSettings = {}, profileImage = null) {
     let roomCode;
     do {
       roomCode = generateRoomCode();
@@ -25,7 +25,7 @@ class RoomService {
     
     // Store room data
     roomRepository.createRoom(roomCode, room.toJSON());
-    userService.joinRoom(roomCode, username);
+    userService.joinRoom(roomCode, username, null, profileImage);
 
     return roomCode;
   }

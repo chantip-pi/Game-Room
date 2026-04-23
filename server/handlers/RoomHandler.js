@@ -19,7 +19,7 @@ function registerRoomHandlers(io, socket) {
         mapDataUrl, 
         mapPublicId, 
         createdBy: username 
-      });
+      }, profileImage);
 
       socket.join(roomCode);
       socket.username = username;
@@ -48,10 +48,9 @@ function registerRoomHandlers(io, socket) {
       roomService.addMessage(roomCode, createMessage);
       io.to(roomCode).emit('receive_message', createMessage.toJSON());
 
-      // Store and broadcast profile image to all users in room (only if it's a Cloudinary URL)
+      // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
       if (profileImage && !profileImage.startsWith('blob:')) {
-        console.log(`Setting profile image for room creator ${username} in room ${roomCode}: ${profileImage}`);
-        roomService.setUserProfile(roomCode, username, profileImage);
+        console.log(`Broadcasting profile image for room creator ${username} in room ${roomCode}: ${profileImage}`);
         io.to(roomCode).emit('user_profile_update', { username, profileImage });
       }
 
@@ -85,11 +84,9 @@ function registerRoomHandlers(io, socket) {
     socket.room = room;
     socket.username = trimmedUsername;
 
-    if (profileImage) {
-      userService.setUserProfile(room, trimmedUsername, profileImage);
-      roomService.setUserProfile(room, trimmedUsername, profileImage);
-      io.to(room).emit('user_profile_update', { username: trimmedUsername, profileImage });
-    }
+    // Always store and broadcast profile state (even if null)
+    roomService.setUserProfile(room, trimmedUsername, profileImage || null);
+    io.to(room).emit('user_profile_update', { username: trimmedUsername, profileImage: profileImage || null });
 
     if (isNewUser) {
       console.log(`Emitting user_joined event for ${trimmedUsername} to room ${room}`);
@@ -112,10 +109,15 @@ function registerRoomHandlers(io, socket) {
     socket.emit('room_info', roomInfoForFrontend);
     socket.emit('chat_history', { messages: roomService.getMessageHistory(room) });
 
-    const existingProfiles = roomService.getUserProfiles(room);
-    if (existingProfiles && Object.keys(existingProfiles).length > 0) {
-      socket.emit('existing_user_profiles', { profiles: existingProfiles });
+ const existingProfiles = roomService.getUserProfiles(room);
+if (existingProfiles) {
+  console.log(`Sending existing profiles to ${trimmedUsername}:`, JSON.stringify(existingProfiles));
+  Object.entries(existingProfiles).forEach(([profileUsername, profileImage]) => {
+    if (profileUsername !== trimmedUsername && profileImage) {
+      socket.emit('user_profile_update', { username: profileUsername, profileImage });
     }
+  });
+}
 
     // Send existing pawn positions to restore positions after refresh
     const existingPawnPositions = roomService.getPawnPositions(room);

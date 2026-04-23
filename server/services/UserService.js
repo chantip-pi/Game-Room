@@ -108,9 +108,7 @@ class UserService {
     const users = this.getUsersInRoom(roomCode);
     const profiles = {};
     users.forEach(user => {
-      if (user.profileImage) {
-        profiles[user.username] = user.profileImage;
-      }
+      profiles[user.username] = user.profileImage || null;
     });
     return profiles;
   }
