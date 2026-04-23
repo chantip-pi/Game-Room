@@ -62,111 +62,83 @@ function registerRoomHandlers(io, socket) {
     }
   });
 
-  socket.on('join_room', ({ username, room, profileImage } = {}) => {
-    try {
-      if (!username || !username.trim() || !room) {
-        return socket.emit('error', { message: 'Username and room code are required.' });
-      }
-
-      const trimmedUsername = username.trim();
-      
-      console.log(`User ${trimmedUsername} joining room ${room} with profileImage: ${profileImage ? 'YES (' + profileImage.substring(0, 50) + '...)' : 'NO'}`);
-      
-      // Only add user if they're not already in the room
-      if (!userService.userExistsInRoom(room, trimmedUsername)) {
-        console.log(`Adding new user ${trimmedUsername} to room ${room} with socket ${socket.id}`);
-        
-        // Handle profile image upload if it's a blob URL
-        let finalProfileImage = profileImage;
-        if (profileImage && profileImage.startsWith('blob:')) {
-          // This shouldn't happen with our current frontend, but handle it just in case
-          console.log(`Warning: Received blob URL for ${trimmedUsername}, this should be handled on frontend`);
-          finalProfileImage = null; // Don't store blob URLs
-        }
-        
-        // Add user to room with socket ID and profile
-        userService.joinRoom(room, trimmedUsername, socket.id, finalProfileImage);
-      } else {
-        console.log(`Updating existing user ${trimmedUsername} in room ${room} with socket ${socket.id}`);
-        // Update existing user's socket ID and profile
-        userService.updateUserSocket(room, trimmedUsername, socket.id);
-        if (profileImage && !profileImage.startsWith('blob:')) {
-          userService.setUserProfile(room, trimmedUsername, profileImage);
-        }
-      }
-
-      socket.join(room);
-      socket.username = username;
-      socket.room = room;
-
-      const users = roomService.getUsersInRoom(room);
-      const messageHistory = roomService.getMessageHistory(room);
-
-      // Only emit user_joined if this is a new connection (not a reconnection)
-      const existingUser = users.find(u => u.username === trimmedUsername);
-      if (!existingUser || !existingUser.isActive) {
-        socket.to(room).emit('user_joined', { username, timestamp: new Date() });
-      }
-      io.to(room).emit('update_users', users);
-      
-      // Send chat history to newly joined user
-      socket.emit('chat_history', { messages: messageHistory });
-      socket.emit('room_joined', { room });
-      
-      // Send room info including map data
-      const roomInfo = roomService.getRoomInfo(room);
-      // Ensure mapDataUrl is set for frontend compatibility
-      const roomInfoForFrontend = {
-        ...roomInfo,
-        mapDataUrl: roomInfo.mapImage || roomInfo.gameSettings?.mapDataUrl
-      };
-      socket.emit('room_info', roomInfoForFrontend);
-
-      // Create and send system message for user joining
-      const joinMessage = Message.createSystemMessage(
-        `${username} has joined the room`,
-        room
-      );
-      roomService.addMessage(room, joinMessage);
-      io.to(room).emit('receive_message', joinMessage.toJSON());
-
-      // Handle profile image - store Cloudinary URLs or trigger upload for blob URLs
-      if (profileImage) {
-        if (profileImage.startsWith('blob:')) {
-          console.log(`User ${username} has blob URL, will upload to Cloudinary: ${profileImage.substring(0, 50)}...`);
-          // Trigger upload immediately
-          socket.emit('upload_profile_image', { imageData: profileImage, filename: 'profile-image', mimetype: 'image/jpeg' });
-        } else {
-          console.log(`Setting Cloudinary profile image for ${username} in room ${room}: ${profileImage}`);
-          roomService.setUserProfile(room, username, profileImage);
-          io.to(room).emit('user_profile_update', { username, profileImage });
-        }
-      }
-
-      // Send existing user profiles to new user (AFTER storing current user's profile)
-      const existingProfiles = roomService.getUserProfiles(room);
-      console.log(`Retrieved existing profiles for room ${room}:`, existingProfiles);
-      if (existingProfiles && Object.keys(existingProfiles).length > 0) {
-        console.log(`Sending existing profiles to ${username}:`, Object.keys(existingProfiles), existingProfiles);
-        socket.emit('existing_user_profiles', { profiles: existingProfiles });
-      } else {
-        console.log(`No existing profiles to send to ${username}`);
-      }
-
-      // Broadcast to all users to check profile images in room (ensures synchronization)
-      console.log(`Broadcasting profile check to all users in room ${room} after ${username} joined`);
-      io.to(room).emit('check_room_profiles', { 
-        room: room,
-        userJoined: username,
-        allProfiles: existingProfiles 
-      });
-
-      console.log(`${username} joined room ${room}`);
-    } catch (err) {
-      console.error('Room join error:', err);
-      socket.emit('error', { message: err.message });
+ socket.on('join_room', ({ username, room, profileImage } = {}) => {
+  try {
+    if (!username?.trim() || !room) {
+      return socket.emit('error', { message: 'Username and room code are required.' });
     }
-  });
+
+    const trimmedUsername = username.trim();
+    const isNewUser = !userService.userExistsInRoom(room, trimmedUsername);
+
+    if (isNewUser) {
+      users = userService.joinRoom(room, trimmedUsername, socket.id, profileImage);
+    } else {
+      userService.updateUserSocket(room, trimmedUsername, socket.id);
+      users = userService.getUsersInRoom(room);
+    }
+
+    // Always re-join the socket.io room channel (handles reconnections)
+    socket.join(room);
+    
+    // Set socket properties for message validation and other handlers
+    socket.room = room;
+    socket.username = trimmedUsername;
+
+    if (profileImage) {
+      userService.setUserProfile(room, trimmedUsername, profileImage);
+      roomService.setUserProfile(room, trimmedUsername, profileImage);
+      io.to(room).emit('user_profile_update', { username: trimmedUsername, profileImage });
+    }
+
+    if (isNewUser) {
+      console.log(`Emitting user_joined event for ${trimmedUsername} to room ${room}`);
+      socket.to(room).emit('user_joined', { username: trimmedUsername, timestamp: new Date() });
+    }
+
+    io.to(room).emit('update_users', users);
+
+    const roomInfo = roomService.getRoomInfo(room);
+    socket.emit('room_joined', { room });
+    
+    // Add null check for roomInfo to prevent error on page refresh
+    const roomInfoForFrontend = roomInfo ? {
+      ...roomInfo,
+      mapDataUrl: roomInfo.mapImage || roomInfo.gameSettings?.mapDataUrl
+    } : {
+      mapDataUrl: null
+    };
+    
+    socket.emit('room_info', roomInfoForFrontend);
+    socket.emit('chat_history', { messages: roomService.getMessageHistory(room) });
+
+    const existingProfiles = roomService.getUserProfiles(room);
+    if (existingProfiles && Object.keys(existingProfiles).length > 0) {
+      socket.emit('existing_user_profiles', { profiles: existingProfiles });
+    }
+
+    // Send existing pawn positions to restore positions after refresh
+    const existingPawnPositions = roomService.getPawnPositions(room);
+    if (existingPawnPositions && Object.keys(existingPawnPositions).length > 0) {
+      const pawnPositionsForSocket = {};
+      Object.entries(existingPawnPositions).forEach(([username, pawn]) => {
+        if (pawn.position) {
+          pawnPositionsForSocket[username] = pawn.position;
+        }
+      });
+      socket.emit('existing_pawn_positions', { positions: pawnPositionsForSocket });
+    }
+
+    const joinMessage = Message.createSystemMessage(`${trimmedUsername} has joined the room`, room);
+    roomService.addMessage(room, joinMessage);
+    io.to(room).emit('receive_message', joinMessage.toJSON());
+
+    console.log(`${trimmedUsername} joined room ${room}`);
+  } catch (err) {
+    console.error('Room join error:', err);
+    socket.emit('error', { message: err.message });
+  }
+});
 
   socket.on('leave_room', ({ room, username } = {}) => {
     try {
@@ -306,7 +278,6 @@ function registerRoomHandlers(io, socket) {
         filename: mapData.publicId.split('/').pop()
       });
 
-      console.log(`Map image uploaded for room ${socket.room} by ${socket.username}`);
     } catch (error) {
       console.error('Map image upload error:', error);
       socket.emit('error', { message: error.message || 'Failed to upload map image.' });

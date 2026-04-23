@@ -11,7 +11,6 @@ class UserService {
     // Check if user already exists
     const existingUser = this.userRepository.getUser(roomCode, username);
     if (existingUser) {
-      // Update existing user instead of creating new one
       existingUser.socketId = socketId;
       existingUser.isActive = true;
       if (profileImage) {
@@ -25,6 +24,7 @@ class UserService {
       this.userRepository.addUser(roomCode, user.toJSON());
       console.log(`Created new user ${username} in room ${roomCode}`);
     }
+    return this.getUsersInRoom(roomCode);
   }
 
   leaveRoom(roomCode, username) {
@@ -33,7 +33,6 @@ class UserService {
 
   getUsersInRoom(roomCode) {
     const users = this.userRepository.getUsersInRoom(roomCode);
-    // Convert to User models if needed and filter active users only
     return users
       .filter(userData => userData.isActive !== false)
       .map(userData => {

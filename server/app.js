@@ -9,6 +9,44 @@ const registerMessageHandlers = require('./handlers/MessageHandler');
 const registerDisconnectHandler = require('./handlers/DisconnectHandler');
 const pawnHandler = require('./handlers/PawnHandler');
 
+// REST endpoint for room validation
+async function validateRoom(req, res) {
+  try {
+    const { roomCode } = req.body;
+    
+    if (!roomCode) {
+      return res.status(400).json({ error: 'Room code is required' });
+    }
+
+    const roomService = require('./services/RoomService');
+    const roomRepository = require('./repositories/RoomRepository');
+    
+    const exists = roomRepository.roomExists(roomCode.trim().toUpperCase());
+    
+    if (exists) {
+      const roomInfo = roomService.getRoomInfo(roomCode.trim().toUpperCase());
+      const userCount = roomService.getUsersInRoom(roomCode.trim().toUpperCase()).length;
+      const maxPlayers = roomInfo?.gameSettings?.playerCount || 4;
+      
+      res.json({
+        exists: true,
+        roomCode: roomCode.trim().toUpperCase(),
+        userCount: userCount,
+        maxPlayers: maxPlayers,
+        isFull: userCount >= maxPlayers
+      });
+    } else {
+      res.json({
+        exists: false,
+        roomCode: roomCode.trim().toUpperCase()
+      });
+    }
+  } catch (error) {
+    console.error('Room validation error:', error);
+    res.status(500).json({ error: 'Failed to validate room' });
+  }
+}
+
 // REST endpoint for profile upload without room context
 async function uploadProfileImage(req, res) {
   try {
@@ -59,6 +97,7 @@ function createApp({ clientOrigin = ['http://localhost:5173', 'http://127.0.0.1:
 
   // Use memory storage for multer
   const upload = multer({ storage: multer.memoryStorage() });
+  app.post('/validate-room', validateRoom);
   app.post('/profile-image', upload.single('image'), uploadProfileImage);
 
   const server = http.createServer(app);

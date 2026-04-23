@@ -15,14 +15,48 @@ function Home() {
     // Socket connection will be handled in UserSettings
   }, []);
 
-  const joinRoom = () => {
+  const joinRoom = async () => {
     if (!room.trim()) {
       setError("Please enter a room code");
       return;
     }
 
+    setIsJoining(true);
     setError("");
-    navigate(`/usersettings?room=${room}`);
+
+    try {
+      const response = await fetch('http://localhost:3001/validate-room', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ roomCode: room.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to validate room');
+      }
+
+      if (!data.exists) {
+        setError("Room does not exist. Please check the room code and try again.");
+        return;
+      }
+
+      if (data.isFull) {
+        setError(`Room is full (${data.userCount}/${data.maxPlayers} players). Please try a different room.`);
+        return;
+      }
+
+      // Room exists and is not full, proceed to user settings
+      navigate(`/usersettings?room=${data.roomCode}`);
+    } catch (error) {
+      console.error('Room validation error:', error);
+      setError(error.message || 'Failed to validate room. Please try again.');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (

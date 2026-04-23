@@ -3,8 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { FiCopy, FiCheck } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
 import ZoomableImage from './components/ZoomableImage';
-import UserPawn from './components/UserPawn';
-import { Stage, Layer, Rect, Text } from 'react-konva';
+import LoadingPage from './components/LoadingPage';
 
 function GameRoom() {
   const [searchParams] = useSearchParams();
@@ -24,178 +23,84 @@ function GameRoom() {
   const [gameAreaSize, setGameAreaSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [userPawns, setUserPawns] = useState({});
   const [userProfiles, setUserProfiles] = useState({});
-  const [profileImageUploaded, setProfileImageUploaded] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const hasJoined = useRef(false); // ← prevents double-emit
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Decode map from URL params (for room creator)
+  useEffect(() => {
+    if (!mapDataParam) return;
+    try {
+      const decoded = decodeURIComponent(mapDataParam);
+      if (decoded && decoded !== 'null') setMapUrl(decoded);
+    } catch {
+      setError('Error decoding map data from URL');
+    }
+  }, [mapDataParam]);
+
+  // Game area resize
+  useEffect(() => {
+    const update = () => {
+      if (gameAreaRef.current) {
+        const rect = gameAreaRef.current.getBoundingClientRect();
+        setGameAreaSize({ width: rect.width, height: rect.height });
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // Pawn position listeners
+  useEffect(() => {
+    socketManager.on("pawn_position_update", (data) => {
+      if (data.username !== username) {
+        setUserPawns(prev => ({ ...prev, [data.username]: data.position }));
+      }
+    });
+    socketManager.on("user_left_pawn", (data) => {
+      setUserPawns(prev => {
+        const next = { ...prev };
+        delete next[data.username];
+        return next;
+      });
+    });
+    return () => {
+      socketManager.off("pawn_position_update");
+      socketManager.off("user_left_pawn");
+    };
+  }, [username]);
+
+  // Check if all essential data is loaded
+  useEffect(() => {
+    if (isJoined && onlineUsers.length > 0 && messages.length >= 0) {
+      // Add a small delay to ensure all data has settled
+      setTimeout(() => setDataLoaded(true), 100);
+    }
+  }, [isJoined, onlineUsers, messages]);
+
+  // Main socket setup — runs once
   useEffect(() => {
     if (!room || !username) {
       navigate("/");
       return;
     }
 
-    // Only join room once
-    if (!isJoined) {
-      console.log(`Emitting join_room for ${username} with profileImage: ${profileImageParam ? 'YES (' + profileImageParam.substring(0, 50) + '...)' : 'NO'}`);
-      socketManager.emit("join_room", { username, room, profileImage: profileImageParam });
+    // Guard against StrictMode double-invoke and reconnects
+    if (!hasJoined.current) {
+      hasJoined.current = true;
+      socketManager.emit("join_room", { username, room, profileImage: profileImageParam || null });
     }
 
-    // Handle profile image upload (only once)
-    const handleProfileImageUpload = async () => {
-      console.log(`Profile image upload triggered for ${username}, profileImageParam: ${profileImageParam ? 'YES (' + profileImageParam.substring(0, 50) + '...)' : 'NO'}, alreadyUploaded: ${profileImageUploaded}`);
-      
-      // Prevent multiple uploads
-      if (profileImageUploaded) {
-        console.log(`Profile image already uploaded for ${username}, skipping`);
-        return;
-      }
-
-      let blobUrl = profileImageParam;
-
-      // Handle File objects (including string representations from URL params)
-      if (profileImageParam) {
-        // Check if it's a string representation of a File object
-        if (typeof profileImageParam === 'string' && profileImageParam.includes('[object File]')) {
-          console.log(`Detected File object string representation for ${username} - this shouldn't happen, skipping upload`);
-          // This is a string representation, not a real File object
-          setUserProfiles(prev => ({
-            ...prev,
-            [username]: null
-          }));
-          setProfileImageUploaded(true);
-          return;
-        }
-        
-        // Check if it's an actual File object
-        if (profileImageParam instanceof File) {
-          console.log(`Converting File object to blob URL for ${username}`);
-          blobUrl = URL.createObjectURL(profileImageParam);
-          console.log(`Created blob URL: ${blobUrl}`);
-        }
-      }
-
-      if (!blobUrl || !blobUrl.startsWith('blob:')) {
-        console.log(`Profile image for ${username} is not a blob URL, using as-is: ${blobUrl}`);
-        // Not a blob URL, use as-is
-        setUserProfiles(prev => ({
-          ...prev,
-          [username]: blobUrl
-        }));
-        setProfileImageUploaded(true);
-        return;
-      }
-
-      console.log(`Starting profile image upload for ${username} from blob URL`);
-      try {
-        // Convert blob to file and upload to server
-        const response = await fetch(blobUrl);
-        const blob = await response.blob();
-        
-        // Use actual MIME type from blob
-        const actualMimeType = blob.type || 'image/jpeg';
-        const extension = actualMimeType === 'image/png' ? '.png' : '.jpg';
-        const filename = `profile${extension}`;
-        
-        const file = new File([blob], filename, { type: actualMimeType });
-        
-        console.log(`Uploading profile image for ${username}: ${filename}, type: ${actualMimeType}`);
-        
-        // Upload profile image to server
-        await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageData = e.target.result;
-            console.log(`Emitting upload_profile_image for ${username}`);
-            socketManager.emit("upload_profile_image", {
-              imageData,
-              filename,
-              mimetype: actualMimeType
-            });
-            resolve();
-          };
-          reader.readAsDataURL(file);
-        });
-        
-        setProfileImageUploaded(true);
-        console.log(`Profile image upload initiated for ${username}`);
-      } catch (error) {
-        console.error('Failed to upload profile image:', error);
-      }
-    };
-
-    // Handle profile image upload completion
-    socketManager.on("profile_image_uploaded", (data) => {
-      setUserProfiles(prev => ({
-        ...prev,
-        [username]: data.url
-      }));
-    });
-
-    // Trigger profile image upload when room is joined
-    const handleRoomJoined = () => {
+    socketManager.on("room_joined", () => {
       setIsJoined(true);
       setError("");
-      handleProfileImageUpload();
-    };
-
-    // Listen for socket events
-    socketManager.on("room_joined", (data) => {
-      handleRoomJoined();
-    });
-
-    // Listen for profile image updates
-    socketManager.on("user_profile_update", (data) => {
-      console.log(`Received profile update for ${data.username}: ${data.profileImage}`);
-      if (data.username !== username) {
-        setUserProfiles(prev => ({
-          ...prev,
-          [data.username]: data.profileImage
-        }));
-        console.log(`Updated profile for ${data.username} in UI`);
-      } else {
-        console.log(`Ignoring own profile update for ${data.username}`);
-      }
-    });
-
-    // Listen for existing user profiles when joining
-    socketManager.on("existing_user_profiles", (data) => {
-      if (data.profiles) {
-        setUserProfiles(prev => ({
-          ...prev,
-          ...data.profiles
-        }));
-      }
-    });
-
-    // Listen for user profile removal
-    socketManager.on("user_profile_remove", (data) => {
-      if (data.username !== username) {
-        setUserProfiles(prev => {
-          const newProfiles = { ...prev };
-          delete newProfiles[data.username];
-          return newProfiles;
-        });
-      }
-    });
-
-    // Listen for profile check broadcasts when new users join
-    socketManager.on("check_room_profiles", (data) => {
-      console.log(`Profile check broadcast received in room ${data.room}:`, data);
-      if (data.allProfiles) {
-        console.log(`Updating all profiles from broadcast:`, data.allProfiles);
-        setUserProfiles(prev => ({
-          ...prev,
-          ...data.allProfiles
-        }));
-      }
     });
 
     socketManager.on("chat_history", (data) => {
@@ -203,7 +108,7 @@ function GameRoom() {
     });
 
     socketManager.on("receive_message", (data) => {
-      setMessages((prev) => [...prev, data]);
+      setMessages(prev => [...prev, data]);
     });
 
     socketManager.on("update_users", (users) => {
@@ -211,19 +116,50 @@ function GameRoom() {
     });
 
     socketManager.on("user_joined", (data) => {
-      setMessages((prev) => [...prev, {
-        message: `${data.username} joined the room`,
+      const username = data?.username || 'Unknown User';
+      setMessages(prev => [...prev, {
+        message: `${username} joined the room`,
         type: "system",
         timestamp: new Date().toISOString()
       }]);
     });
 
     socketManager.on("user_left", (data) => {
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         message: `${data.username} left the room`,
         type: "system",
         timestamp: new Date().toISOString()
       }]);
+    });
+
+    socketManager.on("room_info", (roomInfo) => {
+      if (roomInfo.mapDataUrl) setMapUrl(roomInfo.mapDataUrl);
+    });
+
+    socketManager.on("map_image_updated", (data) => {
+      if (data.url) setMapUrl(data.url);
+    });
+
+    socketManager.on("user_profile_update", (data) => {
+      setUserProfiles(prev => ({ ...prev, [data.username]: data.profileImage }));
+    });
+
+    socketManager.on("existing_user_profiles", (data) => {
+      if (data.profiles) setUserProfiles(prev => ({ ...prev, ...data.profiles }));
+    });
+
+    socketManager.on("user_profile_remove", (data) => {
+      setUserProfiles(prev => {
+        const next = { ...prev };
+        delete next[data.username];
+        return next;
+      });
+    });
+
+    socketManager.on("existing_pawn_positions", (data) => {
+      if (data.positions) {
+        setUserPawns(prev => ({ ...prev, ...data.positions }));
+      }
     });
 
     socketManager.on("error", (data) => {
@@ -233,68 +169,42 @@ function GameRoom() {
       }
     });
 
-    socketManager.on("room_info", (roomInfo) => {
-      if (roomInfo.mapDataUrl) {
-        setMapUrl(roomInfo.mapDataUrl);
-      }
-    });
-
-    socketManager.on("map_image_updated", (data) => {
-      if (data.url) {
-        setMapUrl(data.url);
-      }
-    });
-
     return () => {
       socketManager.off("room_joined");
       socketManager.off("chat_history");
       socketManager.off("receive_message");
+      socketManager.off("update_users");
       socketManager.off("user_joined");
       socketManager.off("user_left");
-      socketManager.off("update_users");
-      socketManager.off("error");
       socketManager.off("room_info");
+      socketManager.off("map_image_updated");
       socketManager.off("user_profile_update");
       socketManager.off("existing_user_profiles");
       socketManager.off("user_profile_remove");
-      socketManager.off("profile_image_uploaded");
-      socketManager.off("map_image_updated");
-      socketManager.off("check_room_profiles");
+      socketManager.off("existing_pawn_positions");
+      socketManager.off("error");
     };
-  }, [room, username, navigate]);
+  }, []); // ← empty deps, runs once
 
+  // Initialize pawn after joining - use fixed starting position only for new users
   useEffect(() => {
-    const updateGameAreaSize = () => {
-      if (gameAreaRef.current) {
-        const rect = gameAreaRef.current.getBoundingClientRect();
-        setGameAreaSize({
-          width: rect.width,
-          height: rect.height
-        });
-      }
-    };
-
-    updateGameAreaSize();
-    window.addEventListener('resize', updateGameAreaSize);
-
-    return () => {
-      window.removeEventListener('resize', updateGameAreaSize);
-    };
-  }, []);
-
-  // Set map URL from URL parameters for room creator
-  useEffect(() => {
-    if (mapDataParam) {
-      try {
-        const decodedMapUrl = decodeURIComponent(mapDataParam);
-        if (decodedMapUrl && decodedMapUrl !== 'null' && decodedMapUrl !== '') {
-          setMapUrl(decodedMapUrl);
-        }
-      } catch (error) {
-        setError('Error decoding map data from URL');
-      }
+    if (!isJoined || !username) return;
+    
+    // Only set initial position if user doesn't already have a pawn position
+    if (!userPawns[username]) {
+      const initial = {
+        x: 30,
+        y: 30
+      };
+      setUserPawns(prev => ({ ...prev, [username]: initial }));
+      socketManager.emit("pawn_position", { room, username, position: initial });
     }
-  }, [mapDataParam]);
+  }, [isJoined, username, userPawns]);
+
+  const handlePawnMove = (newPosition) => {
+    setUserPawns(prev => ({ ...prev, [username]: newPosition }));
+    socketManager.emit("pawn_position", { room, username, position: newPosition });
+  };
 
   const handleLeaveRoom = () => {
     socketManager.emit("leave_room", { room, username });
@@ -302,16 +212,9 @@ function GameRoom() {
   };
 
   const sendMessage = () => {
-    if (message.trim() !== "") {
-      const messageData = {
-        room,
-        message: message.trim(),
-        username,
-        timestamp: new Date().toISOString()
-      };
-      socketManager.emit("send_message", messageData);
-      setMessage("");
-    }
+    if (!message.trim()) return;
+    socketManager.emit("send_message", { room, message: message.trim(), username, timestamp: new Date().toISOString() });
+    setMessage("");
   };
 
   const handleKeyPress = (e) => {
@@ -319,13 +222,6 @@ function GameRoom() {
       e.preventDefault();
       sendMessage();
     }
-  };
-
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   const handleCopyRoomCode = async () => {
@@ -338,81 +234,22 @@ function GameRoom() {
     }
   };
 
-  // Initialize pawn position when user joins
-  useEffect(() => {
-    if (isJoined && username) {
-      // Set initial position for current user if not already set
-      if (!userPawns[username]) {
-        const initialPosition = {
-          x: Math.random() * (gameAreaSize.width - 100) + 50,
-          y: Math.random() * (gameAreaSize.height - 200) + 100
-        };
-        
-        setUserPawns(prev => ({
-          ...prev,
-          [username]: initialPosition
-        }));
-        
-        // Notify other users about initial position
-        socketManager.emit("pawn_position", {
-          room,
-          username,
-          position: initialPosition
-        });
-      }
-    }
-  }, [isJoined, username, gameAreaSize]);
+  const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Handle pawn movement
-  const handlePawnMove = (newPosition) => {
-    setUserPawns(prev => ({
-      ...prev,
-      [username]: newPosition
-    }));
-    
-    // Broadcast position to other users
-    socketManager.emit("pawn_position", {
-      room,
-      username,
-      position: newPosition
-    });
-  };
+  if (!isJoined || !dataLoaded) {
+    const loadingItems = [
+      { label: 'Connected to room', completed: isJoined },
+      { label: 'Users loaded', completed: onlineUsers.length > 0 },
+      { label: 'Chat loaded', completed: messages.length >= 0 }
+    ];
 
-  // Listen for pawn position updates from other users
-  useEffect(() => {
-    socketManager.on("pawn_position_update", (data) => {
-      if (data.username !== username) {
-        setUserPawns(prev => ({
-          ...prev,
-          [data.username]: data.position
-        }));
-      }
-    });
-
-    // Clean up pawns when users leave
-    socketManager.on("user_left_pawn", (data) => {
-      setUserPawns(prev => {
-        const newPawns = { ...prev };
-        delete newPawns[data.username];
-        return newPawns;
-      });
-    });
-
-    return () => {
-      socketManager.off("pawn_position_update");
-      socketManager.off("user_left_pawn");
-    };
-  }, [username]);
-
-  if (!isJoined && !error) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#FDF3FF' }}>
-        <div className="bg-white rounded-2xl p-8 text-center shadow-lg border border-[#EFDBFF]">
-          <h2 className="text-2xl font-bold mb-4" style={{ color: '#6A1CF6' }}>Joining Room...</h2>
-          <p className="text-gray-700 mb-2">Room: {room}</p>
-          <p className="text-gray-700">Welcome: {username}</p>
-        </div>
-      </div>
+      <LoadingPage
+        title={!isJoined ? 'Joining Room...' : 'Loading Game Data...'}
+        room={room}
+        username={username}
+        loadingItems={loadingItems}
+      />
     );
   }
 
@@ -423,11 +260,7 @@ function GameRoom() {
           <h2 className="text-xl font-bold" style={{ color: '#6A1CF6' }}>Game Room:</h2>
           <div className="flex items-center gap-1 bg-[#EFDBFF] px-3 py-1 rounded-lg">
             <span className="font-mono text-sm font-medium text-gray-700">{room}</span>
-            <button
-              onClick={handleCopyRoomCode}
-              className="p-1 rounded hover:bg-[#6A1CF6] hover:text-white transition-colors duration-200"
-              title="Copy room code"
-            >
+            <button onClick={handleCopyRoomCode} className="p-1 rounded hover:bg-[#6A1CF6] hover:text-white transition-colors duration-200" title="Copy room code">
               {copied ? <FiCheck size={14} /> : <FiCopy size={14} />}
             </button>
           </div>
@@ -441,16 +274,10 @@ function GameRoom() {
         </button>
       </div>
 
-      {error && (
-        <div className="w-full p-3 bg-red-100 text-red-800 rounded-lg mb-4 mx-6 mt-4">
-          {error}
-        </div>
-      )}
-
+      {error && <div className="w-full p-3 bg-red-100 text-red-800 rounded-lg mb-4 mx-6 mt-4">{error}</div>}
       {copied && (
         <div className="fixed top-20 right-6 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
-          <FiCheck size={16} />
-          <span className="text-sm font-medium">Room code copied!</span>
+          <FiCheck size={16} /><span className="text-sm font-medium">Room code copied!</span>
         </div>
       )}
 
@@ -459,10 +286,10 @@ function GameRoom() {
           <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
-              <ZoomableImage 
-                imageUrl={mapUrl} 
-                containerWidth={gameAreaSize.width - 48} // Account for padding
-                containerHeight={gameAreaSize.height - 128} // Account for padding and header
+              <ZoomableImage
+                imageUrl={mapUrl}
+                containerWidth={gameAreaSize.width - 48}
+                containerHeight={gameAreaSize.height - 128}
                 userPawns={userPawns}
                 currentUsername={username}
                 userProfiles={userProfiles}

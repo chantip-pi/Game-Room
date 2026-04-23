@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiUploadCloud, FiArrowRight } from "react-icons/fi";
 import { LuMessageCircleWarning } from "react-icons/lu";
 import socketManager from "./utils/socketManager";
+import LoadingPage from './components/LoadingPage';
 
 function UserSettings() {
   const [searchParams] = useSearchParams();
@@ -98,9 +99,20 @@ function UserSettings() {
     }
   };
 
-  useEffect(() => {
-    // Socket connection will be handled in GameRoom
-  }, []);
+  // Show loading page only when submitting (not when uploading image)
+  if (isSubmitting) {
+    const loadingItems = [
+      { label: 'Processing profile', completed: isSubmitting }
+    ];
+
+    return (
+      <LoadingPage
+        title="Processing Profile..."
+        subtitle="Setting up your player profile"
+        loadingItems={loadingItems}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center background-pattern gap-4 py-4">
@@ -136,11 +148,12 @@ function UserSettings() {
               rounded-2xl
               border-2
               border-dashed
-              cursor-pointer
               transition
-              ${profileImage 
-                ? "border-green-500 bg-green-50 hover:bg-green-100" 
-                : "border-purple-300 bg-purple-50 hover:bg-purple-100"
+              ${isUploading 
+                ? "cursor-not-allowed opacity-50 border-gray-300 bg-gray-100" 
+                : profileImage 
+                  ? "border-green-500 bg-green-50 hover:bg-green-100 cursor-pointer" 
+                  : "border-purple-300 bg-purple-50 hover:bg-purple-100 cursor-pointer"
               }
             `}
           >
@@ -186,6 +199,7 @@ function UserSettings() {
               accept="image/png,image/jpeg"
               className="hidden"
               onChange={handleFileSelect}
+              disabled={isUploading}
             />
           </label>
 
@@ -216,7 +230,7 @@ function UserSettings() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="input-field input-animation bg-white"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
             />
           </div>
 
@@ -224,7 +238,7 @@ function UserSettings() {
             <button
               onClick={handleSubmit}
               className="rounded-4xl bg-[#6A1CF6] text-white p-4 font-bold flex items-center justify-center gap-2 button-hover"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploading}
             >
               <div>{isSubmitting ? "Processing..." : (isCreating ? "Continue to Create Room" : "Join Game")}</div>
               <FiArrowRight />
