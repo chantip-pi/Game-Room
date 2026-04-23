@@ -12,7 +12,9 @@ function UserSettings() {
   
   const [username, setUsername] = useState("");
   const [profileImage, setProfileImage] = useState(null);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef(null);
 
@@ -20,7 +22,7 @@ function UserSettings() {
     socketManager.connect();
   }, []);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files[0];
 
     if (!file) return;
@@ -33,8 +35,44 @@ function UserSettings() {
       setError("File size must be less than 5MB");
       return;
     }
+
     setProfileImage(file);
     setError("");
+    
+    // Upload immediately to Cloudinary
+    await uploadProfileImage(file);
+  };
+
+  const uploadProfileImage = async (file) => {
+    setIsUploading(true);
+    setError("");
+    
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('username', username.trim() || 'temp-user');
+      
+      const response = await fetch('http://localhost:3001/profile-image', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+      
+      const result = await response.json();
+      console.log('Profile image uploaded successfully:', result);
+      setProfileImageUrl(result.url);
+      
+    } catch (error) {
+      console.error('Profile image upload error:', error);
+      setError(`Upload failed: ${error.message}`);
+      setProfileImageUrl(null);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -50,22 +88,12 @@ function UserSettings() {
       // Creating room flow - go to create room page with user data
       const userData = {
         username: username.trim(),
-        profileImage: profileImage ? URL.createObjectURL(profileImage) : null
+        profileImage: profileImageUrl || null
       };
       navigate(`/createroom?userData=${encodeURIComponent(JSON.stringify(userData))}`);
     } else {
-      // Joining room flow - proceed to game room
-      let profileImageParam = '';
-      if (profileImage) {
-        if (profileImage instanceof File) {
-          // Convert File object to blob URL
-          profileImageParam = encodeURIComponent(URL.createObjectURL(profileImage));
-          console.log('Converted File object to blob URL for navigation');
-        } else {
-          // Use existing URL or string
-          profileImageParam = encodeURIComponent(profileImage);
-        }
-      }
+      // Joining room flow - proceed to game room with Cloudinary URL
+      const profileImageParam = profileImageUrl ? encodeURIComponent(profileImageUrl) : '';
       navigate(`/gameroom?room=${room}&username=${username.trim()}&profileImage=${profileImageParam}`);
     }
   };
@@ -122,7 +150,16 @@ function UserSettings() {
             </div>
 
             {/* Text */}
-            {profileImage ? (
+            {isUploading ? (
+              <>
+                <p className="text-blue-600 font-semibold text-center">
+                  Uploading profile image...
+                </p>
+                <p className="text-gray-500 text-sm">
+                  Please wait
+                </p>
+              </>
+            ) : profileImageUrl ? (
               <>
                 <p className="text-green-600 font-semibold text-center">
                   Profile image uploaded!
@@ -152,10 +189,10 @@ function UserSettings() {
             />
           </label>
 
-          {profileImage && (
+          {profileImageUrl && (
             <div className="mt-4 flex justify-center">
               <img 
-                src={URL.createObjectURL(profileImage)} 
+                src={profileImageUrl} 
                 alt="Profile preview" 
                 className="w-24 h-24 rounded-full object-cover border-4 border-[#6A1CF6]" 
               />

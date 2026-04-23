@@ -50,10 +50,13 @@ function CreateRoom() {
       setIsCreating(false);
       console.log('Room created, uploading map...');
       
-      // Upload the pending map if it exists
+      // Upload the pending map (should always exist since map is required)
       if (window.pendingMapUpload) {
         socketManager.emit("upload_map_image", window.pendingMapUpload);
         delete window.pendingMapUpload; // Clean up
+      } else {
+        console.error('No pending map upload found - this should not happen since map is required');
+        setError('Map upload failed - please try again');
       }
     });
 
@@ -107,7 +110,8 @@ function CreateRoom() {
           dice, 
           playerCount, 
           turnLimit, 
-          mapDataUrl: null // Will be uploaded separately
+          mapDataUrl: null, // Will be uploaded separately
+          profileImage: userData.profileImage // Pass profile image from userData
         });
         
       } catch (error) {

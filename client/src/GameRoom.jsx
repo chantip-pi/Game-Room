@@ -186,6 +186,18 @@ function GameRoom() {
       }
     });
 
+    // Listen for profile check broadcasts when new users join
+    socketManager.on("check_room_profiles", (data) => {
+      console.log(`Profile check broadcast received in room ${data.room}:`, data);
+      if (data.allProfiles) {
+        console.log(`Updating all profiles from broadcast:`, data.allProfiles);
+        setUserProfiles(prev => ({
+          ...prev,
+          ...data.allProfiles
+        }));
+      }
+    });
+
     socketManager.on("chat_history", (data) => {
       setMessages(data.messages || []);
     });
@@ -247,6 +259,7 @@ function GameRoom() {
       socketManager.off("user_profile_remove");
       socketManager.off("profile_image_uploaded");
       socketManager.off("map_image_updated");
+      socketManager.off("check_room_profiles");
     };
   }, [room, username, navigate]);
 

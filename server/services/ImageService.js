@@ -100,9 +100,9 @@ class ImageService {
     try {
       await this.validateFileContent(buffer, mimetype);
       
-      const sanitizedUsername = this.sanitizeFilename(username);
+      const sanitizedName = this.sanitizeFilename(originalname);
       const folder = `profiles/${roomCode}`;
-      const result = await this.uploadToCloudinary(buffer, sanitizedUsername, folder, {
+      const result = await this.uploadToCloudinary(buffer, sanitizedName, folder, {
         overwrite: true,
         unique_filename: false
       });

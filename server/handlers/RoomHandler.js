@@ -48,8 +48,10 @@ function registerRoomHandlers(io, socket) {
       roomService.addMessage(roomCode, createMessage);
       io.to(roomCode).emit('receive_message', createMessage.toJSON());
 
-      // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
+      // Store and broadcast profile image to all users in room (only if it's a Cloudinary URL)
       if (profileImage && !profileImage.startsWith('blob:')) {
+        console.log(`Setting profile image for room creator ${username} in room ${roomCode}: ${profileImage}`);
+        roomService.setUserProfile(roomCode, username, profileImage);
         io.to(roomCode).emit('user_profile_update', { username, profileImage });
       }
 
@@ -128,18 +130,36 @@ function registerRoomHandlers(io, socket) {
       roomService.addMessage(room, joinMessage);
       io.to(room).emit('receive_message', joinMessage.toJSON());
 
-      // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
-      if (profileImage && !profileImage.startsWith('blob:')) {
-        console.log(`Setting profile image for ${username} in room ${room}: ${profileImage}`);
-        roomService.setUserProfile(room, username, profileImage);
-        io.to(room).emit('user_profile_update', { username, profileImage });
+      // Handle profile image - store Cloudinary URLs or trigger upload for blob URLs
+      if (profileImage) {
+        if (profileImage.startsWith('blob:')) {
+          console.log(`User ${username} has blob URL, will upload to Cloudinary: ${profileImage.substring(0, 50)}...`);
+          // Trigger upload immediately
+          socket.emit('upload_profile_image', { imageData: profileImage, filename: 'profile-image', mimetype: 'image/jpeg' });
+        } else {
+          console.log(`Setting Cloudinary profile image for ${username} in room ${room}: ${profileImage}`);
+          roomService.setUserProfile(room, username, profileImage);
+          io.to(room).emit('user_profile_update', { username, profileImage });
+        }
       }
 
-      // Send existing user profiles to new user
+      // Send existing user profiles to new user (AFTER storing current user's profile)
       const existingProfiles = roomService.getUserProfiles(room);
+      console.log(`Retrieved existing profiles for room ${room}:`, existingProfiles);
       if (existingProfiles && Object.keys(existingProfiles).length > 0) {
+        console.log(`Sending existing profiles to ${username}:`, Object.keys(existingProfiles), existingProfiles);
         socket.emit('existing_user_profiles', { profiles: existingProfiles });
+      } else {
+        console.log(`No existing profiles to send to ${username}`);
       }
+
+      // Broadcast to all users to check profile images in room (ensures synchronization)
+      console.log(`Broadcasting profile check to all users in room ${room} after ${username} joined`);
+      io.to(room).emit('check_room_profiles', { 
+        room: room,
+        userJoined: username,
+        allProfiles: existingProfiles 
+      });
 
       console.log(`${username} joined room ${room}`);
     } catch (err) {
