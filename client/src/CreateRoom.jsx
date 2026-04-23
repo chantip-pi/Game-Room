@@ -124,8 +124,8 @@ function CreateRoom() {
       setError("Please select a PNG or JPEG image");
       return;
     }
-    if (file.size > 1024 * 1024 * 10) {
-      setError("File size must be less than 10MB");
+    if (file.size > 1024 * 1024 * 5) {
+      setError("File size must be less than 5MB");
       return;
     }
     setMap(file);

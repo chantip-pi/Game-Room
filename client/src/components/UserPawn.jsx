@@ -85,31 +85,33 @@ const UserPawn = ({
       {/* Main circle - either profile image or colored circle */}
       {profileImageObj ? (
         <>
-          {/* White background circle for profile image */}
-          <Circle
-            x={cx}
-            y={cy}
-            radius={r - Math.round(4 * sc)}
-            fill="white"
-            stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
-            strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
-          />
-          {/* Profile image clipped to circle */}
-          <KonvaImage
-            x={cx - (r - Math.round(8 * sc))}
-            y={cy - (r - Math.round(8 * sc))}
-            width={(r - Math.round(8 * sc)) * 2}
-            height={(r - Math.round(8 * sc)) * 2}
-            image={profileImageObj}
-            clipFunc={(ctx) => {
-              ctx.arc(cx, cy, r - Math.round(8 * sc), 0, Math.PI * 2, false);
-              ctx.clip();
-            }}
-          />
+          <>
+            <Circle
+              x={cx}
+              y={cy}
+              radius={r}
+              fillPatternImage={profileImageObj}
+              fillPatternOffset={{
+                x: profileImageObj ? profileImageObj.width / 2 : 0,
+                y: profileImageObj ? profileImageObj.height / 2 : 0,
+              }}
+              fillPatternScale={{
+                x:
+                  profileImageObj
+                    ? (r * 2) / profileImageObj.width
+                    : 1,
+                y:
+                  profileImageObj
+                    ? (r * 2) / profileImageObj.height
+                    : 1,
+              }}
+              stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
+              strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
+            />
+          </>
         </>
       ) : (
         <>
-          {/* Main coloured circle - fallback when no profile image */}
           <Circle
             x={cx}
             y={cy}
