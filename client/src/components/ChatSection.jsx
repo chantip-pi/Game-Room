@@ -7,8 +7,7 @@ const ChatSection = ({
   sendMessage, 
   handleKeyPress, 
   onlineUsers, 
-  formatTime,
-  isHidden = false 
+  formatTime
 }) => {
   const messagesEndRef = useRef(null);
 
@@ -16,14 +15,11 @@ const ChatSection = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  if (isHidden) {
-    return null;
-  }
 
   return (
-    <div className="col-span-3 bg-white border-l border-[#EFDBFF] flex flex-col">
+    <div className="col-span-3 border-r border-gray-200 bg-white flex flex-col order-1 h-[40vh]">
       <h3 className="px-4 py-3 font-semibold border-b border-[#EFDBFF] text-gray-700">Chat</h3>
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((msg, index) => (
           <div key={index} className="break-words">
             {msg.type === 'system' ? (

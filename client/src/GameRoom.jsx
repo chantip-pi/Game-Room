@@ -7,6 +7,7 @@ import LoadingPage from './components/LoadingPage';
 import ChatSection from './components/ChatSection';
 import Timer from './components/Timer';
 import TimerErrorBoundary from './components/TimerErrorBoundary';
+import GameDice from './components/GameDice';
 
 function GameRoom() {
   const location = useLocation();
@@ -30,7 +31,6 @@ function GameRoom() {
   const [userPawns, setUserPawns] = useState({});
   const [userProfiles, setUserProfiles] = useState({});
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [isChatVisible, setIsChatVisible] = useState(true);
   const [roomInfo, setRoomInfo] = useState({});
 
   const messagesEndRef = useRef(null);
@@ -259,9 +259,7 @@ function GameRoom() {
 
   const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const toggleChat = () => {
-    setIsChatVisible(!isChatVisible);
-  };
+
 
   if (!isJoined || !dataLoaded) {
     const loadingItems = [
@@ -295,12 +293,6 @@ function GameRoom() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-700">User: {username}</span>
           <span className="text-sm font-medium" style={{ color: '#6A1CF6' }}>{onlineUsers.length} online</span>
-          <button 
-            onClick={toggleChat} 
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all duration-200 flex items-center gap-2"
-          >
-          {isChatVisible ? "Hide Chat" : "Show Chat"}
-          </button>
           <button onClick={handleLeaveRoom} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200">
             Leave Room
           </button>
@@ -315,19 +307,42 @@ function GameRoom() {
       )}
 
       <div className="grid grid-cols-12" style={{ height: 'calc(100vh - 73px)' }}>
-        <div className={`p-6 ${isChatVisible ? 'col-span-9' : 'col-span-12'}`} ref={gameAreaRef}>
-          <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
+        {/* Left column - Timer and Game Controls */}
+        <div className="col-span-3 p-6 border-r border-gray-200">
+          <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Controls</h3>
+          
+          {/* Timer */}
           <TimerErrorBoundary>
             <Timer
               turnLimit={roomInfo.gameSettings.turnLimit} 
               onTimeUp={handleTimeUp}
             />
           </TimerErrorBoundary>
+          
+          {/* Dice Display */}
+          {roomInfo.gameSettings && (
+            <div className="mt-6">
+              <GameDice dice={roomInfo.gameSettings.dice} />
+            </div>
+          )}
+           <ChatSection
+            messages={messages}
+            message={message}
+            setMessage={setMessage}
+            sendMessage={sendMessage}
+            handleKeyPress={handleKeyPress}
+            onlineUsers={onlineUsers}
+            formatTime={formatTime}
+          />
+        </div>
+        
+        <div className="p-6 col-span-9" ref={gameAreaRef}>
+          <h3 className=" text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
               <ZoomableImage
                 imageUrl={mapUrl}
-                containerWidth={gameAreaSize.width - (isChatVisible ? 48 : 24)}
+                containerWidth={gameAreaSize.width - 48}
                 containerHeight={gameAreaSize.height - 128}
                 userPawns={userPawns}
                 currentUsername={username}
@@ -345,19 +360,19 @@ function GameRoom() {
           </div>
         </div>
 
-        <ChatSection
-          messages={messages}
-          message={message}
-          setMessage={setMessage}
-          sendMessage={sendMessage}
-          handleKeyPress={handleKeyPress}
-          onlineUsers={onlineUsers}
-          formatTime={formatTime}
-          isHidden={!isChatVisible}
-        />
       </div>
     </div>
   );
 }
 
-export default GameRoom;
+import GameRoomErrorBoundary from './components/GameRoomErrorBoundary';
+
+const GameRoomWithErrorBoundary = () => {
+  return (
+    <GameRoomErrorBoundary>
+      <GameRoom />
+    </GameRoomErrorBoundary>
+  );
+};
+
+export default GameRoomWithErrorBoundary;

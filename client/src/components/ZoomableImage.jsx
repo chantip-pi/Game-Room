@@ -85,7 +85,7 @@ const ZoomableImage = ({ imageUrl, containerWidth, containerHeight, userPawns, c
 
   if (!image) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+      <div className="flex  items-center justify-center h-full bg-gray-100 rounded-lg">
         <p className="text-gray-500">No map image available</p>
       </div>
     );
