@@ -25,7 +25,7 @@ function Home() {
     setError("");
 
     try {
-      const response = await fetch('http://localhost:3001/validate-room', {
+      const response = await fetch(`${process.env.VITE_SERVER_URL}/validate-room`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

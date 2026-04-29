@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 class SocketManager {
   constructor() {
     this.socket = null;
-    this.serverUrl = 'http://localhost:3001';
+    this.serverUrl = process.env.VITE_SERVER_URL;
   }
 
   connect() {
