@@ -4,13 +4,29 @@ const imageService = require('../services/ImageService');
 const { Message, User } = require('../models/index');
 
 function registerRoomHandlers(io, socket) {
+  // Timer management
+  const roomTimers = {}; // Store active timers per room
+
   socket.on('create_room', ({ username, dice, playerCount, turnLimit, mapDataUrl, mapPublicId, profileImage } = {}) => {
     try {
+      // Validate required parameters
       if (!username || !username.trim()) {
         return socket.emit('error', { message: 'Username is required.' });
       }
       
-      // Map image is now optional - will be uploaded separately
+      if (dice === undefined || dice === null) {
+        return socket.emit('error', { message: 'Dice setting is required.' });
+      }
+      
+      if (playerCount === undefined || playerCount === null || playerCount < 2 || playerCount > 8) {
+        return socket.emit('error', { message: 'Player count must be between 2 and 8.' });
+      }
+      
+      if (turnLimit === undefined || turnLimit === null || turnLimit < 30 || turnLimit > 3600) {
+        return socket.emit('error', { message: 'Turn limit must be between 30 seconds and 1 hour.' });
+      }
+      
+      // Map image and profile picture are optional
 
       const roomCode = roomService.createRoom(username, { 
         dice, 
@@ -283,6 +299,172 @@ if (existingProfiles) {
     } catch (error) {
       console.error('Map image upload error:', error);
       socket.emit('error', { message: error.message || 'Failed to upload map image.' });
+    }
+  });
+
+  // Timer event handlers
+  socket.on('start_timer', ({ room }) => {
+    try {
+      if (!room) {
+        return socket.emit('error', { message: 'Room code is required.' });
+      }
+
+      const roomInfo = roomService.getRoomInfo(room);
+      if (!roomInfo || !roomInfo.gameSettings.turnLimit) {
+        return socket.emit('error', { message: 'No turn limit set for this room.' });
+      }
+
+      // Clear existing timer for this room
+      if (roomTimers[room]) {
+        clearInterval(roomTimers[room].interval);
+      }
+
+      const turnLimit = roomInfo.gameSettings.turnLimit;
+      let timeLeft = turnLimit;
+
+      // Start new timer
+      roomTimers[room] = {
+        startTime: Date.now(),
+        timeLeft: turnLimit,
+        interval: setInterval(() => {
+          timeLeft--;
+          roomTimers[room].timeLeft = timeLeft;
+
+          // Broadcast timer update to all clients in room
+          io.to(room).emit('timer_update', { 
+            timeLeft, 
+            totalTime: turnLimit,
+            isRunning: true 
+          });
+
+          // Handle timer end
+          if (timeLeft <= 0) {
+            clearInterval(roomTimers[room].interval);
+            roomTimers[room].isRunning = false;
+            
+            io.to(room).emit('timer_end', { 
+              timeLeft: 0, 
+              totalTime: turnLimit,
+              isRunning: false 
+            });
+
+            // Add system message
+            const timeUpMessage = Message.createSystemMessage("Time's up! Turn ended.", room);
+            roomService.addMessage(room, timeUpMessage);
+            io.to(room).emit('receive_message', timeUpMessage.toJSON());
+          }
+        }, 1000)
+      };
+
+      // Emit initial timer state
+      io.to(room).emit('timer_start', { 
+        timeLeft: turnLimit, 
+        totalTime: turnLimit,
+        isRunning: true 
+      });
+
+      console.log(`Timer started for room ${room} with ${turnLimit} seconds`);
+    } catch (error) {
+      console.error('Timer start error:', error);
+      socket.emit('error', { message: 'Failed to start timer.' });
+    }
+  });
+
+  socket.on('stop_timer', ({ room }) => {
+    try {
+      if (!room) {
+        return socket.emit('error', { message: 'Room code is required.' });
+      }
+
+      if (roomTimers[room] && roomTimers[room].interval) {
+        clearInterval(roomTimers[room].interval);
+        roomTimers[room].isRunning = false;
+
+        io.to(room).emit('timer_stop', { 
+          timeLeft: roomTimers[room].timeLeft,
+          totalTime: roomTimers[room].totalTime || 0,
+          isRunning: false 
+        });
+
+        console.log(`Timer stopped for room ${room}`);
+      }
+    } catch (error) {
+      console.error('Timer stop error:', error);
+      socket.emit('error', { message: 'Failed to stop timer.' });
+    }
+  });
+
+  socket.on('reset_timer', ({ room }) => {
+    try {
+      if (!room) {
+        return socket.emit('error', { message: 'Room code is required.' });
+      }
+
+      const roomInfo = roomService.getRoomInfo(room);
+      if (!roomInfo || !roomInfo.gameSettings.turnLimit) {
+        return socket.emit('error', { message: 'No turn limit set for this room.' });
+      }
+
+      // Clear existing timer
+      if (roomTimers[room] && roomTimers[room].interval) {
+        clearInterval(roomTimers[room].interval);
+      }
+
+      const turnLimit = roomInfo.gameSettings.turnLimit;
+
+      // Reset timer state
+      roomTimers[room] = {
+        startTime: Date.now(),
+        timeLeft: turnLimit,
+        totalTime: turnLimit,
+        isRunning: false
+      };
+
+      io.to(room).emit('timer_reset', { 
+        timeLeft: turnLimit, 
+        totalTime: turnLimit,
+        isRunning: false 
+      });
+
+      console.log(`Timer reset for room ${room}`);
+    } catch (error) {
+      console.error('Timer reset error:', error);
+      socket.emit('error', { message: 'Failed to reset timer.' });
+    }
+  });
+
+  socket.on('get_timer_state', ({ room }) => {
+    try {
+      if (!room) {
+        return socket.emit('error', { message: 'Room code is required.' });
+      }
+
+      if (roomTimers[room]) {
+        socket.emit('timer_state', {
+          timeLeft: roomTimers[room].timeLeft,
+          totalTime: roomTimers[room].totalTime || 0,
+          isRunning: roomTimers[room].isRunning || false
+        });
+      } else {
+        const roomInfo = roomService.getRoomInfo(room);
+        socket.emit('timer_state', {
+          timeLeft: roomInfo.gameSettings.turnLimit || 0,
+          totalTime: roomInfo.gameSettings.turnLimit || 0,
+          isRunning: false
+        });
+      }
+    } catch (error) {
+      console.error('Timer state error:', error);
+      socket.emit('error', { message: 'Failed to get timer state.' });
+    }
+  });
+
+  // Clean up timer when socket disconnects
+  socket.on('disconnect', () => {
+    if (socket.room && roomTimers[socket.room]) {
+      clearInterval(roomTimers[socket.room].interval);
+      delete roomTimers[socket.room];
+      console.log(`Timer cleaned up for room ${socket.room}`);
     }
   });
 }

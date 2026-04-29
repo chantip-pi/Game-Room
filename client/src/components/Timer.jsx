@@ -1,0 +1,251 @@
+import React, { useState, useEffect, useRef } from 'react';
+import socketManager from '../utils/socketManager';
+
+const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
+  const [timeLeft, setTimeLeft] = useState(turnLimit || 60);
+  const [isRunning, setIsRunning] = useState(false);
+  const [totalTime, setTotalTime] = useState(turnLimit || 60);
+  const [error, setError] = useState(null);
+  const roomRef = useRef(null);
+
+  // Get room from URL or props
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      roomRef.current = urlParams.get('room');
+      console.log('Timer: Room detected:', roomRef.current);
+      console.log('Timer: Turn limit:', turnLimit);
+    } catch (err) {
+      console.error('Error getting room from URL:', err);
+      setError('Failed to get room information');
+    }
+  }, [turnLimit]);
+
+  // Timer is now controlled by server-side socket events
+  // No local timer logic needed - all updates come from server
+
+  // Socket event listeners for synchronization
+  useEffect(() => {
+    if (!socketManager || !roomRef.current) {
+      console.log('Timer: No socket manager or room available');
+      return;
+    }
+
+    console.log('Timer: Setting up socket listeners for room:', roomRef.current);
+
+    const handleTimerStart = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        console.log('Timer: Received timer_start event', data);
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+      } catch (err) {
+        console.error('Error handling timer start:', err);
+      }
+    };
+
+    const handleTimerUpdate = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+      } catch (err) {
+        console.error('Error handling timer update:', err);
+      }
+    };
+
+    const handleTimerStop = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+      } catch (err) {
+        console.error('Error handling timer stop:', err);
+      }
+    };
+
+    const handleTimerReset = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+      } catch (err) {
+        console.error('Error handling timer reset:', err);
+      }
+    };
+
+    const handleTimerEnd = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        console.log('Timer: Received timer_end event', data);
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+        if (onTimeUp) onTimeUp();
+      } catch (err) {
+        console.error('Error handling timer end:', err);
+      }
+    };
+
+    const handleTimerState = (data) => {
+      try {
+        const { timeLeft, totalTime, isRunning } = data || {};
+        console.log('Timer: Received timer_state event', data);
+        setTimeLeft(timeLeft || 0);
+        setTotalTime(totalTime || 0);
+        setIsRunning(isRunning || false);
+      } catch (err) {
+        console.error('Error handling timer state:', err);
+      }
+    };
+
+    // Register event listeners
+    socketManager.on('timer_start', handleTimerStart);
+    socketManager.on('timer_update', handleTimerUpdate);
+    socketManager.on('timer_stop', handleTimerStop);
+    socketManager.on('timer_reset', handleTimerReset);
+    socketManager.on('timer_end', handleTimerEnd);
+    socketManager.on('timer_state', handleTimerState);
+
+    // Request current timer state when component mounts
+    socketManager.emit('get_timer_state', { room: roomRef.current });
+
+    // Cleanup
+    return () => {
+      if (socketManager) {
+        socketManager.off('timer_start', handleTimerStart);
+        socketManager.off('timer_update', handleTimerUpdate);
+        socketManager.off('timer_stop', handleTimerStop);
+        socketManager.off('timer_reset', handleTimerReset);
+        socketManager.off('timer_end', handleTimerEnd);
+        socketManager.off('timer_state', handleTimerState);
+      }
+    };
+  }, [onTimeUp]);
+
+  const formatTime = (seconds) => {
+    if (seconds <= 0) return "00:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const getTimerColor = () => {
+    if (timeLeft <= 0) return "text-red-600";
+    if (timeLeft <= 10) return "text-orange-500";
+    if (timeLeft <= 30) return "text-yellow-500";
+    return "text-green-600";
+  };
+
+  const getTimerBgColor = () => {
+    if (timeLeft <= 0) return "bg-red-100 border-red-300";
+    if (timeLeft <= 10) return "bg-orange-100 border-orange-300";
+    if (timeLeft <= 30) return "bg-yellow-100 border-yellow-300";
+    return "bg-green-100 border-green-300";
+  };
+
+  // Show error message if there's an error
+  if (error) {
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-red-300 bg-red-100 ${className}`}>
+        <span className="text-red-600 text-sm">Timer Error</span>
+      </div>
+    );
+  }
+
+  // Show placeholder if no turn limit
+  if (!turnLimit || turnLimit <= 0) {
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-gray-100 ${className}`}>
+        <span className="text-gray-500 text-sm">No Timer Set</span>
+      </div>
+    );
+  }
+
+  const handleStart = () => {
+    console.log('Timer: Start button clicked, emitting start_timer event');
+    if (roomRef.current && socketManager) {
+      socketManager.emit('start_timer', { room: roomRef.current });
+    }
+  };
+
+  const handleStop = () => {
+    console.log('Timer: Stop button clicked, emitting stop_timer event');
+    if (roomRef.current && socketManager) {
+      socketManager.emit('stop_timer', { room: roomRef.current });
+    }
+  };
+
+  const handleReset = () => {
+    console.log('Timer: Reset button clicked, emitting reset_timer event');
+    if (roomRef.current && socketManager) {
+      socketManager.emit('reset_timer', { room: roomRef.current });
+    }
+  };
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${getTimerBgColor()} ${className}`}>
+      <svg 
+        className={`w-4 h-4 ${getTimerColor()}`} 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <circle 
+          cx="12" 
+          cy="12" 
+          r="10" 
+          strokeWidth="2"
+          className="opacity-30"
+        />
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth="2" 
+          d="M12 6v6l4 2"
+          className={getTimerColor()}
+        />
+      </svg>
+      <span className={`font-mono font-semibold ${getTimerColor()}`}>
+        {formatTime(timeLeft)}
+      </span>
+      {timeLeft <= 10 && timeLeft > 0 && (
+        <span className="text-xs text-red-600 font-medium animate-pulse">
+          Time running out!
+        </span>
+      )}
+      <div className="flex gap-1 ml-2">
+        {!isRunning ? (
+          <button
+            onClick={handleStart}
+            className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors duration-200"
+            title="Start Timer"
+          >
+            Start
+          </button>
+        ) : (
+          <button
+            onClick={handleStop}
+            className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors duration-200"
+            title="Stop Timer"
+          >
+            Stop
+          </button>
+        )}
+        <button
+          onClick={handleReset}
+          className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors duration-200"
+          title="Reset Timer"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default Timer;

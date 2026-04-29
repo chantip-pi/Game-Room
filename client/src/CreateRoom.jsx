@@ -85,6 +85,23 @@ function CreateRoom() {
       setError("User data not found. Please go back and set up your profile.");
       return;
     }
+    
+    // Validate required parameters
+    if (!dice) {
+      setError("Please select a dice type.");
+      return;
+    }
+    
+    if (!playerCount || playerCount < 2 || playerCount > 8) {
+      setError("Player count must be between 2 and 8.");
+      return;
+    }
+    
+    if (!turnLimit || turnLimit < 30 || turnLimit > 3600) {
+      setError("Turn limit must be between 30 seconds and 1 hour.");
+      return;
+    }
+    
     if (!map) {
       setError("Please upload a map image to create a room");
       return;

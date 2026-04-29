@@ -5,6 +5,8 @@ import socketManager from "./utils/socketManager";
 import ZoomableImage from './components/ZoomableImage';
 import LoadingPage from './components/LoadingPage';
 import ChatSection from './components/ChatSection';
+import Timer from './components/Timer';
+import TimerErrorBoundary from './components/TimerErrorBoundary';
 
 function GameRoom() {
   const [searchParams] = useSearchParams();
@@ -26,6 +28,7 @@ function GameRoom() {
   const [userProfiles, setUserProfiles] = useState({});
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(true);
+  const [roomInfo, setRoomInfo] = useState({});
 
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
@@ -136,6 +139,7 @@ function GameRoom() {
 
     socketManager.on("room_info", (roomInfo) => {
       if (roomInfo.mapDataUrl) setMapUrl(roomInfo.mapDataUrl);
+      setRoomInfo(roomInfo);
     });
 
     socketManager.on("map_image_updated", (data) => {
@@ -236,6 +240,20 @@ function GameRoom() {
     }
   };
 
+  const handleTimeUp = () => {
+    // Add system message when time is up
+    setMessages(prev => [...prev, {
+      message: "Time's up! Turn ended.",
+      type: "system",
+      timestamp: new Date().toISOString()
+    }]);
+    
+    // Could add additional logic here like:
+    // - Emit turn end event to server
+    // - Switch to next player
+    // - Reset timer for next turn
+  };
+
   const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const toggleChat = () => {
@@ -296,6 +314,12 @@ function GameRoom() {
       <div className="grid grid-cols-12" style={{ height: 'calc(100vh - 73px)' }}>
         <div className={`p-6 ${isChatVisible ? 'col-span-9' : 'col-span-12'}`} ref={gameAreaRef}>
           <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
+          <TimerErrorBoundary>
+            <Timer
+              turnLimit={roomInfo.gameSettings.turnLimit} 
+              onTimeUp={handleTimeUp}
+            />
+          </TimerErrorBoundary>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
               <ZoomableImage

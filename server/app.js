@@ -26,13 +26,15 @@ async function validateRoom(req, res) {
     if (exists) {
       const roomInfo = roomService.getRoomInfo(roomCode.trim().toUpperCase());
       const userCount = roomService.getUsersInRoom(roomCode.trim().toUpperCase()).length;
-      const maxPlayers = roomInfo?.gameSettings?.playerCount || 4;
+      const maxPlayers = roomInfo.gameSettings.playerCount || 4;
+      const turnLimit = roomInfo.gameSettings.turnLimit || 60;
       
       res.json({
         exists: true,
         roomCode: roomCode.trim().toUpperCase(),
         userCount: userCount,
         maxPlayers: maxPlayers,
+        turnLimit: turnLimit,
         isFull: userCount >= maxPlayers
       });
     } else {
