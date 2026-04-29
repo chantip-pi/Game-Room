@@ -32,7 +32,6 @@ const pawnHandler = (io, socket) => {
         lastMoved: pawn.lastMoved
       });
       
-      console.log(`Pawn position updated for ${username} in room ${room}:`, position);
     } catch (error) {
       console.error('Pawn position update error:', error);
       socket.emit('error', { message: 'Failed to update pawn position.' });
