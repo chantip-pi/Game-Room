@@ -24,7 +24,7 @@ const ChatSection = ({
           <div key={index} className="break-words">
             {msg.type === 'system' ? (
               <div className="text-center text-sm text-gray-500 py-2">
-                {msg.message}
+                {msg.content}
                 <span className="text-xs text-gray-400 ml-2">{formatTime(msg.timestamp)}</span>
               </div>
             ) : (
@@ -33,7 +33,7 @@ const ChatSection = ({
                   <span className="font-semibold text-sm" style={{ color: '#6A1CF6' }}>{msg.username}</span>
                   <span className="text-xs text-gray-500">{formatTime(msg.timestamp)}</span>
                 </div>
-                <div className="text-gray-700">{msg.message}</div>
+                <div className="text-gray-700">{msg.content}</div>
               </div>
             )}
           </div>

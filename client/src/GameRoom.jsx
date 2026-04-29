@@ -126,7 +126,7 @@ function GameRoom() {
     socketManager.on("user_joined", (data) => {
       const username = data?.username || 'Unknown User';
       setMessages(prev => [...prev, {
-        message: `${username} joined the room`,
+        content: `${username} joined the room`,
         type: "system",
         timestamp: new Date().toISOString()
       }]);
@@ -134,7 +134,7 @@ function GameRoom() {
 
     socketManager.on("user_left", (data) => {
       setMessages(prev => [...prev, {
-        message: `${data.username} left the room`,
+        content: `${data.username} left the room`,
         type: "system",
         timestamp: new Date().toISOString()
       }]);
@@ -243,20 +243,7 @@ function GameRoom() {
     }
   };
 
-  const handleTimeUp = () => {
-    // Add system message when time is up
-    setMessages(prev => [...prev, {
-      message: "Time's up! Turn ended.",
-      type: "system",
-      timestamp: new Date().toISOString()
-    }]);
-    
-    // Could add additional logic here like:
-    // - Emit turn end event to server
-    // - Switch to next player
-    // - Reset timer for next turn
-  };
-
+  
   const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 
@@ -315,7 +302,6 @@ function GameRoom() {
           <TimerErrorBoundary>
             <Timer
               turnLimit={roomInfo.gameSettings.turnLimit} 
-              onTimeUp={handleTimeUp}
             />
           </TimerErrorBoundary>
           

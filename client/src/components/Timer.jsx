@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import socketManager from '../utils/socketManager';
 
-const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
+const Timer = ({ turnLimit, className = "" }) => {
   const [timeLeft, setTimeLeft] = useState(turnLimit || 60);
   const [isRunning, setIsRunning] = useState(false);
   const [totalTime, setTotalTime] = useState(turnLimit || 60);
@@ -14,8 +14,11 @@ const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
   useEffect(() => {
     try {
       const stateData = location.state || {};
-      roomRef.current = stateData.room;
-      console.log('Timer: Room detected:', roomRef.current);
+      // Only set room if it's not already set to prevent unnecessary updates
+      if (!roomRef.current && stateData.room) {
+        roomRef.current = stateData.room;
+        console.log('Timer: Room detected:', roomRef.current);
+      }
       console.log('Timer: Turn limit:', turnLimit);
     } catch (err) {
       console.error('Error getting room from location state:', err);
@@ -87,7 +90,6 @@ const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
         setTimeLeft(timeLeft || 0);
         setTotalTime(totalTime || 0);
         setIsRunning(isRunning || false);
-        if (onTimeUp) onTimeUp();
       } catch (err) {
         console.error('Error handling timer end:', err);
       }
@@ -113,9 +115,6 @@ const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
     socketManager.on('timer_end', handleTimerEnd);
     socketManager.on('timer_state', handleTimerState);
 
-    // Request current timer state when component mounts
-    socketManager.emit('get_timer_state', { room: roomRef.current });
-
     // Cleanup
     return () => {
       if (socketManager) {
@@ -127,7 +126,14 @@ const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
         socketManager.off('timer_state', handleTimerState);
       }
     };
-  }, [onTimeUp]);
+  }, []);
+
+  // Request current timer state when room becomes available (runs once)
+  useEffect(() => {
+    if (socketManager && roomRef.current) {
+      socketManager.emit('get_timer_state', { room: roomRef.current });
+    }
+  }, []); // Empty dependency array to run only once
 
   const formatTime = (seconds) => {
     if (seconds <= 0) return "00:00";
