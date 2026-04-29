@@ -3,8 +3,8 @@ const userService = require('./UserService');
 const messageService = require('./MessageService');
 const pawnService = require('./PawnService');
 const imageService = require('./ImageService');
-const { generateRoomCode } = require('../utils/generateRoomCode');
-const { Room, User, Message } = require('../models/index');
+const { generateRoomCode } = require('../utils/GenerateRoomCode');
+const { Room, Message } = require('../models/index');
 
 class RoomService {
   constructor() {
