@@ -78,8 +78,6 @@ async function uploadProfileImage(req, res) {
       'temp-profiles', // Temporary folder, will be moved to room folder later
       { overwrite: true, unique_filename: false }
     );
-
-    console.log(`Profile image uploaded for ${username}: ${result.secure_url}`);
     
     res.json({
       success: true,
@@ -93,7 +91,7 @@ async function uploadProfileImage(req, res) {
   }
 }
 
-function createApp({ clientOrigin = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:64892', 'http://127.0.0.1:64892'] } = {}) {
+function createApp({ clientOrigin = ['https://game-room-xi.vercel.app'] } = {}) {
   const app = express();
   app.use(cors());
   app.use(express.json());

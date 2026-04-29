@@ -51,8 +51,10 @@ function registerDiceHandlers(io, socket) {
           timestamp: timestamp || new Date().toISOString()
         });
 
-        }, 1000);
+        console.log(`[${room}] ${username} rolled ${type}: ${value}`);
+      }, 1000);
     } catch (err) {
+      console.error('Dice roll handling error:', err);
       return socket.emit('error', { message: err.message });
     }
   });

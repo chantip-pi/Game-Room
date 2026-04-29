@@ -82,7 +82,7 @@ class ImageService {
             console.error(`Cloudinary upload failed:`, error);
             return reject(error);
           }
-          console.log(`Cloudinary upload successful: ${result.public_id} -> ${result.secure_url}`);
+          console.log(`Cloudinary upload successful`);
           resolve(result);
         }
       );
