@@ -32,10 +32,8 @@ function registerMessageHandlers(io, socket) {
       // Broadcast to all users in room
       io.to(room).emit('receive_message', newMessage.toJSON());
 
-      console.log(`[${room}] ${username}: ${message}`);
-    } catch (err) {
-      console.error('Message handling error:', err);
-      return socket.emit('error', { message: err.message });
+          } catch (err) {
+            return socket.emit('error', { message: err.message });
     }
   });
 }

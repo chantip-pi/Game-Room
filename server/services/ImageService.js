@@ -5,11 +5,6 @@ const fileType = require('file-type');
 
 // Cloudinary is auto-configured from CLOUDINARY_URL env variable
 // Fallback configuration for development
-if (!process.env.CLOUDINARY_URL) {
-  console.warn('CLOUDINARY_URL environment variable not set. Image uploads will not work.');
-  console.log('Please create a .env file with your Cloudinary credentials:');
-  console.log('CLOUDINARY_URL=cloudinary://YOUR_API_KEY:YOUR_API_SECRET@YOUR_CLOUD_NAME');
-}
 
 
 const ALLOWED_MIME_TYPES = [

@@ -66,12 +66,10 @@ function registerRoomHandlers(io, socket) {
 
       // Broadcast profile image to all users in room (only if it's a Cloudinary URL)
       if (profileImage && !profileImage.startsWith('blob:')) {
-        console.log(`Broadcasting profile image for room creator ${username} in room ${roomCode}: ${profileImage}`);
-        io.to(roomCode).emit('user_profile_update', { username, profileImage });
+                io.to(roomCode).emit('user_profile_update', { username, profileImage });
       }
 
-      console.log(`Room ${roomCode} created by ${username}`);
-    } catch (error) {
+          } catch (error) {
       console.error('Room creation error:', error);
       socket.emit('error', { message: 'Failed to create room.' });
     }
@@ -151,8 +149,7 @@ if (existingProfiles) {
     roomService.addMessage(room, joinMessage);
     io.to(room).emit('receive_message', joinMessage.toJSON());
 
-    console.log(`${trimmedUsername} joined room ${room}`);
-  } catch (err) {
+      } catch (err) {
     console.error('Room join error:', err);
     socket.emit('error', { message: err.message });
   }
@@ -191,8 +188,7 @@ if (existingProfiles) {
         io.to(room).emit('update_users', result.users);
       }
 
-      console.log(`${username} left room ${room}`);
-    } catch (error) {
+          } catch (error) {
       console.error('Room leave error:', error);
       socket.emit('error', { message: 'Failed to leave room.' });
     }
@@ -228,8 +224,7 @@ if (existingProfiles) {
       roomService.setUserProfile(socket.room, socket.username, profileData.url);
 
       // Broadcast profile update to room
-      console.log(`Broadcasting profile update for ${socket.username} to room ${socket.room}: ${profileData.url}`);
-      io.to(socket.room).emit('user_profile_update', { 
+            io.to(socket.room).emit('user_profile_update', { 
         username: socket.username, 
         profileImage: profileData.url 
       });
@@ -239,8 +234,7 @@ if (existingProfiles) {
         filename: profileData.publicId.split('/').pop()
       });
 
-      console.log(`Profile image uploaded for ${socket.username} in room ${socket.room}`);
-    } catch (error) {
+          } catch (error) {
       console.error('Profile image upload error:', error);
       socket.emit('error', { message: error.message || 'Failed to upload profile image.' });
     }
@@ -363,8 +357,7 @@ if (existingProfiles) {
         isRunning: true 
       });
 
-      console.log(`Timer started for room ${room} with ${turnLimit} seconds`);
-    } catch (error) {
+          } catch (error) {
       console.error('Timer start error:', error);
       socket.emit('error', { message: 'Failed to start timer.' });
     }
@@ -386,8 +379,7 @@ if (existingProfiles) {
           isRunning: false 
         });
 
-        console.log(`Timer stopped for room ${room}`);
-      }
+              }
     } catch (error) {
       console.error('Timer stop error:', error);
       socket.emit('error', { message: 'Failed to stop timer.' });
@@ -426,8 +418,7 @@ if (existingProfiles) {
         isRunning: false 
       });
 
-      console.log(`Timer reset for room ${room}`);
-    } catch (error) {
+          } catch (error) {
       console.error('Timer reset error:', error);
       socket.emit('error', { message: 'Failed to reset timer.' });
     }
@@ -464,8 +455,7 @@ if (existingProfiles) {
     if (socket.room && roomTimers[socket.room]) {
       clearInterval(roomTimers[socket.room].interval);
       delete roomTimers[socket.room];
-      console.log(`Timer cleaned up for room ${socket.room}`);
-    }
+          }
   });
 }
 
