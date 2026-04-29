@@ -296,7 +296,6 @@ function GameRoom() {
       <div className="grid grid-cols-12" style={{ height: 'calc(100vh - 73px)' }}>
         {/* Left column - Timer and Game Controls */}
         <div className="col-span-3 p-6 border-r border-gray-200">
-          <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Controls</h3>
           
           {/* Timer */}
           <TimerErrorBoundary>
@@ -323,7 +322,6 @@ function GameRoom() {
         </div>
         
         <div className="p-6 col-span-9" ref={gameAreaRef}>
-          <h3 className=" text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
               <ZoomableImage

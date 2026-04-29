@@ -196,29 +196,9 @@ const Timer = ({ turnLimit, className = "" }) => {
   };
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${getTimerBgColor()} ${className}`}>
-      <svg 
-        className={`w-4 h-4 ${getTimerColor()}`} 
-        fill="none" 
-        stroke="currentColor" 
-        viewBox="0 0 24 24"
-      >
-        <circle 
-          cx="12" 
-          cy="12" 
-          r="10" 
-          strokeWidth="2"
-          className="opacity-30"
-        />
-        <path 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          strokeWidth="2" 
-          d="M12 6v6l4 2"
-          className={getTimerColor()}
-        />
-      </svg>
-      <span className={`font-mono font-semibold ${getTimerColor()}`}>
+    <div className={`flex flex-col items-center gap-2 px-3 py-2 rounded-lg border ${getTimerBgColor()} ${className}`}>
+
+      <span className={`font-mono text-2xl font-semibold ${getTimerColor()}`}>
         {formatTime(timeLeft)}
       </span>
       {timeLeft <= 10 && timeLeft > 0 && (
@@ -226,11 +206,11 @@ const Timer = ({ turnLimit, className = "" }) => {
           Time running out!
         </span>
       )}
-      <div className="flex gap-1 ml-2">
+      <div className="flex gap-1">
         {!isRunning ? (
           <button
             onClick={handleStart}
-            className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded transition-colors duration-200"
+            className="mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors duration-200"
             title="Start Timer"
           >
             Start
@@ -238,7 +218,7 @@ const Timer = ({ turnLimit, className = "" }) => {
         ) : (
           <button
             onClick={handleStop}
-            className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition-colors duration-200"
+            className="mt-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded transition-colors duration-200"
             title="Stop Timer"
           >
             Stop
@@ -246,7 +226,7 @@ const Timer = ({ turnLimit, className = "" }) => {
         )}
         <button
           onClick={handleReset}
-          className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors duration-200"
+          className="mt-2 px-4 py-2 bg-blue-400 hover:bg-blue-600 text-white rounded transition-colors duration-200"
           title="Reset Timer"
         >
           Reset
