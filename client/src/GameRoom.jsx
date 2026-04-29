@@ -171,6 +171,15 @@ function GameRoom() {
       }
     });
 
+    socketManager.on("dice_roll", (data) => {
+      // Show other players' dice rolls in chat
+      setMessages(prev => [...prev, {
+        content: `${data.username} rolled a ${data.value}!`,
+        type: "system",
+        timestamp: new Date().toISOString()
+      }]);
+    });
+
     socketManager.on("error", (data) => {
       setError(data.message);
       if (data.message.includes("does not exist")) {
@@ -191,6 +200,7 @@ function GameRoom() {
       socketManager.off("existing_user_profiles");
       socketManager.off("user_profile_remove");
       socketManager.off("existing_pawn_positions");
+      socketManager.off("dice_roll");
       socketManager.off("error");
     };
   }, []); // ← empty deps, runs once
@@ -231,6 +241,17 @@ function GameRoom() {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  const handleDiceRoll = (diceData) => {
+    // Broadcast dice roll to server
+    socketManager.emit('dice_roll', { 
+      room, 
+      username, 
+      type: diceData.type,
+      value: diceData.value,
+      timestamp: diceData.timestamp
+    });
   };
 
   const handleCopyRoomCode = async () => {
@@ -307,7 +328,7 @@ function GameRoom() {
           {/* Dice Display */}
           {roomInfo.gameSettings && (
             <div className="mt-6">
-              <GameDice dice={roomInfo.gameSettings.dice} />
+              <GameDice dice={roomInfo.gameSettings.dice} onRoll={handleDiceRoll} />
             </div>
           )}
            <ChatSection

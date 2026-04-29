@@ -8,6 +8,7 @@ const registerRoomHandlers = require('./handlers/RoomHandler');
 const registerMessageHandlers = require('./handlers/MessageHandler');
 const registerDisconnectHandler = require('./handlers/DisconnectHandler');
 const pawnHandler = require('./handlers/PawnHandler');
+const registerDiceHandlers = require('./handlers/DiceHandler');
 
 // REST endpoint for room validation
 async function validateRoom(req, res) {
@@ -118,6 +119,7 @@ function createApp({ clientOrigin = ['http://localhost:5173', 'http://127.0.0.1:
     registerRoomHandlers(io, socket);
     registerMessageHandlers(io, socket);
     pawnHandler(io, socket);
+    registerDiceHandlers(io, socket);
     registerDisconnectHandler(io, socket);
   });
  
