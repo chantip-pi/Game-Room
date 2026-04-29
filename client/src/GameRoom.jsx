@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { FiCopy, FiCheck } from "react-icons/fi";
+import { FiCopy, FiCheck, FiMessageSquare, FiX } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
 import ZoomableImage from './components/ZoomableImage';
 import LoadingPage from './components/LoadingPage';
+import ChatSection from './components/ChatSection';
 
 function GameRoom() {
   const [searchParams] = useSearchParams();
@@ -24,6 +25,7 @@ function GameRoom() {
   const [userPawns, setUserPawns] = useState({});
   const [userProfiles, setUserProfiles] = useState({});
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isChatVisible, setIsChatVisible] = useState(true);
 
   const messagesEndRef = useRef(null);
   const gameAreaRef = useRef(null);
@@ -236,6 +238,10 @@ function GameRoom() {
 
   const formatTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  const toggleChat = () => {
+    setIsChatVisible(!isChatVisible);
+  };
+
   if (!isJoined || !dataLoaded) {
     const loadingItems = [
       { label: 'Connected to room', completed: isJoined },
@@ -268,10 +274,16 @@ function GameRoom() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-700">User: {username}</span>
           <span className="text-sm font-medium" style={{ color: '#6A1CF6' }}>{onlineUsers.length} online</span>
+          <button 
+            onClick={toggleChat} 
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all duration-200 flex items-center gap-2"
+          >
+          {isChatVisible ? "Hide Chat" : "Show Chat"}
+          </button>
+          <button onClick={handleLeaveRoom} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200">
+            Leave Room
+          </button>
         </div>
-        <button onClick={handleLeaveRoom} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200">
-          Leave Room
-        </button>
       </div>
 
       {error && <div className="w-full p-3 bg-red-100 text-red-800 rounded-lg mb-4 mx-6 mt-4">{error}</div>}
@@ -282,13 +294,13 @@ function GameRoom() {
       )}
 
       <div className="grid grid-cols-12" style={{ height: 'calc(100vh - 73px)' }}>
-        <div className="col-span-9 p-6" ref={gameAreaRef}>
+        <div className={`p-6 ${isChatVisible ? 'col-span-9' : 'col-span-12'}`} ref={gameAreaRef}>
           <h3 className="text-lg font-semibold mb-4 text-gray-700">Game Area</h3>
           <div className="bg-white rounded-lg border border-[#EFDBFF] shadow-sm overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             {mapUrl ? (
               <ZoomableImage
                 imageUrl={mapUrl}
-                containerWidth={gameAreaSize.width - 48}
+                containerWidth={gameAreaSize.width - (isChatVisible ? 48 : 24)}
                 containerHeight={gameAreaSize.height - 128}
                 userPawns={userPawns}
                 currentUsername={username}
@@ -306,56 +318,16 @@ function GameRoom() {
           </div>
         </div>
 
-        <div className="col-span-3 bg-white border-l border-[#EFDBFF] flex flex-col">
-          <h3 className="px-4 py-3 font-semibold border-b border-[#EFDBFF] text-gray-700">Chat</h3>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-            {messages.map((msg, index) => (
-              <div key={index} className="break-words">
-                {msg.type === 'system' ? (
-                  <div className="text-center text-sm text-gray-500 py-2">
-                    {msg.message}
-                    <span className="text-xs text-gray-400 ml-2">{formatTime(msg.timestamp)}</span>
-                  </div>
-                ) : (
-                  <div className="bg-[#EFDBFF] rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-sm" style={{ color: '#6A1CF6' }}>{msg.username}</span>
-                      <span className="text-xs text-gray-500">{formatTime(msg.timestamp)}</span>
-                    </div>
-                    <div className="text-gray-700">{msg.message}</div>
-                  </div>
-                )}
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="p-4 border-t border-[#EFDBFF] flex gap-2">
-            <input
-              type="text"
-              placeholder="Type a message..."
-              className="flex-1 px-3 py-2 bg-gray-50 border border-[#EFDBFF] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6A1CF6] focus:border-transparent placeholder-gray-500 text-gray-700"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-            />
-            <button onClick={sendMessage} className="px-4 py-2 font-medium rounded-lg transition-all duration-200 text-white" style={{ backgroundColor: '#6A1CF6' }}>
-              Send
-            </button>
-          </div>
-
-          {onlineUsers.length > 0 && (
-            <div className="px-4 py-3 border-t border-[#EFDBFF]">
-              <h4 className="text-sm font-semibold mb-2 text-gray-700">Online Users:</h4>
-              {onlineUsers.map((user, index) => (
-                <div key={index} className="flex items-center gap-2 text-sm text-gray-600 py-1">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6A1CF6' }}></span>
-                  {user.username || user}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ChatSection
+          messages={messages}
+          message={message}
+          setMessage={setMessage}
+          sendMessage={sendMessage}
+          handleKeyPress={handleKeyPress}
+          onlineUsers={onlineUsers}
+          formatTime={formatTime}
+          isHidden={!isChatVisible}
+        />
       </div>
     </div>
   );
