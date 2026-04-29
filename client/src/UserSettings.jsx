@@ -91,11 +91,20 @@ function UserSettings() {
         username: username.trim(),
         profileImage: profileImageUrl || null
       };
-      navigate(`/createroom?userData=${encodeURIComponent(JSON.stringify(userData))}`);
+      navigate('/createroom', {
+        state: {
+          userData: userData
+        }
+      });
     } else {
       // Joining room flow - proceed to game room with Cloudinary URL
-      const profileImageParam = profileImageUrl ? encodeURIComponent(profileImageUrl) : '';
-      navigate(`/gameroom?room=${room}&username=${username.trim()}&profileImage=${profileImageParam}`);
+      navigate('/gameroom', {
+        state: {
+          room: room,
+          username: username.trim(),
+          profileImage: profileImageUrl || null
+        }
+      });
     }
   };
 

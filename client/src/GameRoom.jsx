@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FiCopy, FiCheck, FiMessageSquare, FiX } from "react-icons/fi";
 import socketManager from "./utils/socketManager";
 import ZoomableImage from './components/ZoomableImage';
@@ -9,12 +9,15 @@ import Timer from './components/Timer';
 import TimerErrorBoundary from './components/TimerErrorBoundary';
 
 function GameRoom() {
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const room = searchParams.get("room") || "";
-  const username = searchParams.get("username") || "";
-  const mapDataParam = searchParams.get("mapData") || "";
-  const profileImageParam = searchParams.get("profileImage") || "";
+  
+  // Get data from router state, fallback to URL params for backward compatibility
+  const stateData = location.state || {};
+  const room = stateData.room || "";
+  const username = stateData.username || "";
+  const profileImageParam = stateData.profileImage || "";
+  const mapDataParam = stateData.mapData || "";
 
   const [messages, setMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import socketManager from '../utils/socketManager';
 
 const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
@@ -8,18 +9,19 @@ const Timer = ({ turnLimit, onTimeUp, className = "" }) => {
   const [error, setError] = useState(null);
   const roomRef = useRef(null);
 
-  // Get room from URL or props
+  // Get room from location state
+  const location = useLocation();
   useEffect(() => {
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      roomRef.current = urlParams.get('room');
+      const stateData = location.state || {};
+      roomRef.current = stateData.room;
       console.log('Timer: Room detected:', roomRef.current);
       console.log('Timer: Turn limit:', turnLimit);
     } catch (err) {
-      console.error('Error getting room from URL:', err);
+      console.error('Error getting room from location state:', err);
       setError('Failed to get room information');
     }
-  }, [turnLimit]);
+  }, [turnLimit, location.state]);
 
   // Timer is now controlled by server-side socket events
   // No local timer logic needed - all updates come from server

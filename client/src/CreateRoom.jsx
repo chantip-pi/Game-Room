@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LuCirclePlus, LuMessageCircleWarning } from "react-icons/lu";
 import { FaDiceD20, FaDiceD6 } from "react-icons/fa";
 import { GiD12 } from "react-icons/gi";
@@ -16,18 +16,13 @@ function CreateRoom() {
   const [map, setMap] = useState(null);
   const [uploadingMap, setUploadingMap] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const inputRef = useRef(null);
-  const [searchParams] = useSearchParams();
-  const userDataParam = searchParams.get("userData");
 
-  // Parse once, store in a ref — never causes re-renders or stale closures
+  // Get userData from location state
   const userDataRef = useRef(null);
-  if (!userDataRef.current && userDataParam) {
-    try {
-      userDataRef.current = JSON.parse(decodeURIComponent(userDataParam));
-    } catch {
-      // handled below
-    }
+  if (!userDataRef.current && location.state) {
+    userDataRef.current = location.state.userData;
   }
 
   // Pending map upload stored in ref, not window global
@@ -63,8 +58,13 @@ function CreateRoom() {
     socketManager.on("map_image_uploaded", (data) => {
       // Read from ref — always fresh, no stale closure
       const { username, profileImage } = userDataRef.current;
-      const profileImageParam = profileImage ? encodeURIComponent(profileImage) : '';
-      navigate(`/gameroom?room=${data.roomCode}&username=${username}&profileImage=${profileImageParam}`);
+      navigate('/gameroom', {
+        state: {
+          room: data.roomCode,
+          username: username,
+          profileImage: profileImage
+        }
+      });
     });
 
     socketManager.on("error", (data) => {
