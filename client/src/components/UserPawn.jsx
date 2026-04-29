@@ -13,7 +13,9 @@ const UserPawn = ({
   userProfileImage = null,
 }) => {
   const BASE = 80;
-  const size = BASE * imageScale;
+  // Make current user pawn slightly larger
+  const currentUserScale = isCurrentUser ? 1.1 : 1;
+  const size = BASE * imageScale * currentUserScale;
   const r = size / 2;
   const cx = r;
   const cy = r;
@@ -21,8 +23,8 @@ const UserPawn = ({
   const [profileImageObj, setProfileImageObj] = useState(null);
 
   const COLORS = [
-    '#6A1CF6', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-    '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
+    '#6A1CF6', '#ff0000', '#ff9900', '#004c5e', '#96CEB4',
+    '#ffc400', '#ff3fff', '#9de8ff', '#ffffff', '#000000',
   ];
   const colorIdx = user.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length;
   const color = COLORS[colorIdx];
@@ -72,14 +74,14 @@ const UserPawn = ({
         fill="rgba(0,0,0,0.25)"
       />
 
-      {/* White halo ring — makes the pawn pop on any background */}
+      {/* User color halo ring — makes the pawn pop on any background */}
       <Circle
         x={cx}
         y={cy}
         radius={r - Math.round(1 * sc)}
-        fill="white"
-        stroke="white"
-        strokeWidth={Math.round(3 * sc)}
+        fill={color}
+        stroke={color}
+        strokeWidth={Math.round(6 * sc)}
       />
 
       {/* Main circle - either profile image or colored circle */}
@@ -105,7 +107,7 @@ const UserPawn = ({
                     ? (r * 2) / profileImageObj.height
                     : 1,
               }}
-              stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
+              stroke={isCurrentUser ? color : `${color}59`}
               strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
             />
           </>
@@ -117,7 +119,7 @@ const UserPawn = ({
             y={cy}
             radius={r - Math.round(4 * sc)}
             fill={color}
-            stroke={isCurrentUser ? '#111' : 'rgba(0,0,0,0.35)'}
+            stroke={isCurrentUser ? color : `${color}59`}
             strokeWidth={isCurrentUser ? Math.round(3 * sc) : Math.round(1.5 * sc)}
           />
           {/* User initial - fallback when no profile image */}
