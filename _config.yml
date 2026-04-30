@@ -1,0 +1,7 @@
+exclude:
+  - node_modules
+  - server/node_modules
+  - '.git'
+  - '.gitignore'
+  - 'Gemfile'
+  - 'Gemfile.lock'

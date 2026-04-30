@@ -26,6 +26,11 @@ function Home() {
 
     try {
       const serverUrl = process.env.VITE_SERVER_URL;
+      console.log('Server URL being used:', serverUrl);
+      if (!serverUrl) {
+        throw new Error('VITE_SERVER_URL environment variable is not set');
+      }
+      
       const response = await fetch(`${serverUrl}/validate-room`, {
         method: 'POST',
         headers: {

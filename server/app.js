@@ -91,7 +91,7 @@ async function uploadProfileImage(req, res) {
   }
 }
 
-function createApp({ clientOrigin = ['https://game-room-xi.vercel.app'] } = {}) {
+function createApp({ clientOrigin = process.env.CLIENT_ORIGIN } = {}) {
   const app = express();
   app.use(cors());
   app.use(express.json());
