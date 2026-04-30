@@ -53,7 +53,8 @@ function UserSettings() {
       formData.append('image', file);
       formData.append('username', username.trim() || 'temp-user');
       
-      const response = await fetch(`${process.env.VITE_SERVER_URL}/profile-image`, {
+      const serverUrl = import.meta.env.VITE_SERVER_URL;
+      const response = await fetch(`${serverUrl}/profile-image`, {
         method: 'POST',
         body: formData
       });

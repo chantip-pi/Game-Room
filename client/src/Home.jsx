@@ -25,7 +25,7 @@ function Home() {
     setError("");
 
     try {
-      const serverUrl = process.env.VITE_SERVER_URL;
+      const serverUrl = import.meta.env.VITE_SERVER_URL;
       console.log('Server URL being used:', serverUrl);
       if (!serverUrl) {
         throw new Error('VITE_SERVER_URL environment variable is not set');
