@@ -20,6 +20,17 @@ function GameRoom() {
   const profileImageParam = stateData.profileImage || "";
   const mapDataParam = stateData.mapData || "";
 
+  // Early validation - redirect to home if required data is missing
+  useEffect(() => {
+    if (!room || !username) {
+      navigate("/");
+    }
+  }, [room, username, navigate]);
+
+  if (!room || !username) {
+    return null; // Render nothing while redirecting
+  }
+
   const [messages, setMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [message, setMessage] = useState("");

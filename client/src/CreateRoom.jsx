@@ -25,6 +25,17 @@ function CreateRoom() {
     userDataRef.current = location.state.userData;
   }
 
+  // Early validation - redirect if userData is missing
+  useEffect(() => {
+    if (!userDataRef.current) {
+      navigate('/usersettings?creating=true');
+    }
+  }, [navigate]);
+
+  if (!userDataRef.current) {
+    return null; // Render nothing while redirecting
+  }
+
   // Pending map upload stored in ref, not window global
   const pendingMapRef = useRef(null);
 

@@ -21,7 +21,12 @@ function UserSettings() {
 
   useEffect(() => {
     socketManager.connect();
-  }, []);
+    
+    // Validation: if not creating room and no room parameter, redirect to home
+    if (!isCreating && !room) {
+      navigate('/');
+    }
+  }, [isCreating, room, navigate]);
 
   const handleFileSelect = async (e) => {
     const file = e.target.files[0];
