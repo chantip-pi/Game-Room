@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaArrowRight } from "react-icons/fa";
 import { LuCirclePlus } from "react-icons/lu";
 import { LuMessageCircleWarning } from "react-icons/lu";
-import socketManager from "./utils/socketManager";
 
 function Home() {
   const [room, setRoom] = useState("");
@@ -12,7 +11,6 @@ function Home() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Socket connection will be handled in UserSettings
   }, []);
 
   const joinRoom = async () => {
@@ -62,7 +60,7 @@ function Home() {
         return;
       }
 
-      // Room exists and is not full, proceed to user settings
+  
       navigate(`/usersettings?room=${data.roomCode}`);
     } catch (error) {
       console.error('Room validation error:', error);
